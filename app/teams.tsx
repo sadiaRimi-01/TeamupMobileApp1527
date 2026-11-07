@@ -4,11 +4,13 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  SafeAreaView,
   TextInput,
   TouchableOpacity,
   Alert,
+  Platform,
+  StatusBar,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { THEME } from "../src/constants/theme";
@@ -16,6 +18,12 @@ import { HERO_MEMBERS, POPULAR_SKILLS } from "../src/constants/mockData";
 import { TeamMember } from "../src/types";
 
 export default function TeamsScreen() {
+  const insets = useSafeAreaInsets();
+  const topPadding = Math.max(
+    insets.top,
+    Platform.OS === "android" ? (StatusBar.currentHeight || 28) : 0
+  );
+
   const params = useLocalSearchParams<{ skill?: string }>();
   const [search, setSearch] = useState(params.skill || "");
   const [selectedFilter, setSelectedFilter] = useState(params.skill || "All");
@@ -43,9 +51,9 @@ export default function TeamsScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Top Header */}
-      <View style={styles.header}>
+    <View style={styles.container}>
+      {/* Top Header with Safe Inset */}
+      <View style={[styles.header, { paddingTop: topPadding + 8 }]}>
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={22} color={THEME.inkDark} />
         </TouchableOpacity>
@@ -196,7 +204,7 @@ export default function TeamsScreen() {
           );
         })}
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 

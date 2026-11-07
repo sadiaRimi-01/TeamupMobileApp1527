@@ -4,10 +4,12 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  SafeAreaView,
   TouchableOpacity,
   Alert,
+  Platform,
+  StatusBar,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { THEME } from "../src/constants/theme";
@@ -77,6 +79,12 @@ const INITIAL_TASKS: TaskItem[] = [
 ];
 
 export default function TasksScreen() {
+  const insets = useSafeAreaInsets();
+  const topPadding = Math.max(
+    insets.top,
+    Platform.OS === "android" ? (StatusBar.currentHeight || 28) : 0
+  );
+
   const [tasks, setTasks] = useState<TaskItem[]>(INITIAL_TASKS);
   const [activeTab, setActiveTab] = useState<"all" | "todo" | "in_progress" | "done">("all");
 
@@ -110,9 +118,9 @@ export default function TasksScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
+    <View style={styles.container}>
+      {/* Header with Safe Area */}
+      <View style={[styles.header, { paddingTop: topPadding + 8 }]}>
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={22} color={THEME.inkDark} />
         </TouchableOpacity>
@@ -220,7 +228,7 @@ export default function TasksScreen() {
           );
         })}
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 

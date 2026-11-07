@@ -201,7 +201,7 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     padding: 20,
     borderWidth: 1.5,
-    borderColor: "rgba(234, 76, 137, 0.25)",
+    borderColor: "rgba(79, 70, 229, 0.25)",
     shadowColor: THEME.brandPink,
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.1,

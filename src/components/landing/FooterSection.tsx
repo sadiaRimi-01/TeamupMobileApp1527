@@ -48,7 +48,7 @@ export default function FooterSection({
       {/* Tech Stack Badge */}
       <View style={styles.techStackCard}>
         <View style={styles.techStackHeader}>
-          <Ionicons name="hardware-chip-outline" size={14} color={THEME.brandPink} />
+          <Ionicons name="hardware-chip-outline" size={14} color={THEME.accent} />
           <Text style={styles.techStackTitle}>PROJECT ARCHITECTURE</Text>
         </View>
         <Text style={styles.techStackItems}>

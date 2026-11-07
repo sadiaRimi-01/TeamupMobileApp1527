@@ -570,7 +570,7 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "rgba(234, 76, 137, 0.2)",
+    borderColor: "rgba(79, 70, 229, 0.2)",
   },
   invitedButton: {
     backgroundColor: THEME.pastelMint,

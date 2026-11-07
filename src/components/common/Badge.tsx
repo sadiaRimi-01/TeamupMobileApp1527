@@ -19,18 +19,18 @@ export default function Badge({
   const getColors = () => {
     switch (variant) {
       case "violet":
-        return { bg: THEME.pastelViolet, text: THEME.accentViolet, border: "rgba(124, 92, 255, 0.2)" };
+        return { bg: THEME.pastelViolet, text: THEME.accentViolet, border: "rgba(79, 70, 229, 0.2)" };
       case "cyan":
-        return { bg: THEME.pastelSky, text: "#0891B2", border: "rgba(34, 211, 238, 0.2)" };
+        return { bg: THEME.pastelSky, text: "#0891B2", border: "rgba(6, 182, 212, 0.2)" };
       case "mint":
-        return { bg: THEME.pastelMint, text: "#059669", border: "rgba(61, 219, 176, 0.2)" };
+        return { bg: THEME.pastelMint, text: "#059669", border: "rgba(16, 185, 129, 0.2)" };
       case "dark":
         return { bg: "rgba(255,255,255,0.12)", text: THEME.white, border: "rgba(255,255,255,0.2)" };
       case "outline":
         return { bg: THEME.white, text: THEME.textPrimary, border: THEME.cardBorder };
       case "pink":
       default:
-        return { bg: THEME.pastelPink, text: THEME.brandPink, border: "rgba(234, 76, 137, 0.2)" };
+        return { bg: THEME.pastelPink, text: THEME.brandPink, border: "rgba(79, 70, 229, 0.25)" };
     }
   };
 
@@ -81,7 +81,7 @@ const styles = StyleSheet.create({
     width: 14,
     height: 14,
     borderRadius: 7,
-    backgroundColor: "rgba(234, 76, 137, 0.25)",
+    backgroundColor: "rgba(79, 70, 229, 0.25)",
   },
   radarCore: {
     width: 6,

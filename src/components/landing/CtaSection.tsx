@@ -143,7 +143,7 @@ const styles = StyleSheet.create({
     width: 140,
     height: 140,
     borderRadius: 70,
-    backgroundColor: "rgba(234, 76, 137, 0.25)",
+    backgroundColor: "rgba(167, 139, 250, 0.3)",
   },
   badge: {
     flexDirection: "row",
@@ -159,7 +159,7 @@ const styles = StyleSheet.create({
   badgeText: {
     fontSize: 11,
     fontWeight: "900",
-    color: THEME.brandPink,
+    color: THEME.accent,
     letterSpacing: 0.8,
   },
   title: {
@@ -170,7 +170,7 @@ const styles = StyleSheet.create({
     letterSpacing: -0.6,
   },
   pinkText: {
-    color: THEME.brandPink,
+    color: THEME.accent,
   },
   subtitle: {
     fontSize: 14,

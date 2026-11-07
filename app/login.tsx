@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-
 import {
   View,
   Text,
@@ -7,13 +6,22 @@ import {
   TouchableOpacity,
   StyleSheet,
   Alert,
+  Platform,
+  StatusBar,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { router } from "expo-router";
 
 import { COLORS } from "../constants/colors";
 
 export default function LoginScreen() {
+  const insets = useSafeAreaInsets();
+  const topPadding = Math.max(
+    insets.top,
+    Platform.OS === "android" ? (StatusBar.currentHeight || 28) : 0
+  );
+
   const [email, setEmail] = useState("");
 
   const [password, setPassword] = useState("");
@@ -35,7 +43,7 @@ export default function LoginScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: topPadding + 20 }]}>
       <TouchableOpacity onPress={() => router.back()}>
         <Text style={styles.back}>← Back</Text>
       </TouchableOpacity>

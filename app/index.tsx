@@ -1,12 +1,11 @@
 import React, { useState, useRef } from "react";
 import {
-  SafeAreaView,
+  View,
   ScrollView,
   StyleSheet,
-  StatusBar,
-  View,
   LayoutChangeEvent,
 } from "react-native";
+import { StatusBar } from "expo-status-bar";
 import { router } from "expo-router";
 
 import { THEME } from "../src/constants/theme";
@@ -26,7 +25,7 @@ import FooterSection from "../src/components/landing/FooterSection";
 
 export default function HomeScreen() {
   const [drawerVisible, setDrawerVisible] = useState(false);
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<any>(null);
   const sectionPositions = useRef<Record<string, number>>({});
 
   const handleLayout = (sectionId: string, event: LayoutChangeEvent) => {
@@ -41,10 +40,10 @@ export default function HomeScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor={THEME.white} />
+    <View style={styles.container}>
+      <StatusBar style="dark" />
 
-      {/* Top Sticky Header */}
+      {/* Top Sticky Header with Status Bar Inset Protection */}
       <HeaderNav
         onMenuPress={() => setDrawerVisible(true)}
         onLoginPress={() => router.push("/login")}
@@ -123,7 +122,7 @@ export default function HomeScreen() {
         onClose={() => setDrawerVisible(false)}
         onScrollToSection={handleScrollToSection}
       />
-    </SafeAreaView>
+    </View>
   );
 }
 

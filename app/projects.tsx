@@ -4,11 +4,13 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  SafeAreaView,
   TextInput,
   TouchableOpacity,
   Alert,
+  Platform,
+  StatusBar,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { THEME } from "../src/constants/theme";
@@ -73,6 +75,12 @@ const SAMPLE_PROJECTS: ProjectItem[] = [
 ];
 
 export default function ProjectsScreen() {
+  const insets = useSafeAreaInsets();
+  const topPadding = Math.max(
+    insets.top,
+    Platform.OS === "android" ? (StatusBar.currentHeight || 28) : 0
+  );
+
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [appliedProjects, setAppliedProjects] = useState<Record<string, boolean>>({});
@@ -93,9 +101,9 @@ export default function ProjectsScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Top Header */}
-      <View style={styles.header}>
+    <View style={styles.container}>
+      {/* Top Header with Safe Area Inset */}
+      <View style={[styles.header, { paddingTop: topPadding + 8 }]}>
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={22} color={THEME.inkDark} />
         </TouchableOpacity>
@@ -215,7 +223,7 @@ export default function ProjectsScreen() {
           );
         })}
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 

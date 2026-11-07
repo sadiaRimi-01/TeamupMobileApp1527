@@ -6,8 +6,10 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
-  SafeAreaView,
+  Platform,
+  StatusBar,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { THEME } from "../../constants/theme";
@@ -25,6 +27,12 @@ export default function DrawerMenu({
   onClose,
   onScrollToSection,
 }: DrawerMenuProps) {
+  const insets = useSafeAreaInsets();
+  const topPadding = Math.max(
+    insets.top,
+    Platform.OS === "android" ? (StatusBar.currentHeight || 28) : 0
+  );
+
   const landingLinks = [
     { id: "hero", label: "Overview", icon: "home-outline" as const },
     { id: "problem", label: "The Problem", icon: "alert-circle-outline" as const },
@@ -65,8 +73,8 @@ export default function DrawerMenu({
       transparent={false}
       onRequestClose={onClose}
     >
-      <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
+      <View style={styles.container}>
+        <View style={[styles.header, { paddingTop: topPadding + 10 }]}>
           <TeamUpLogo size={32} />
           <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
             <Ionicons name="close" size={24} color={THEME.inkDark} />
@@ -158,7 +166,7 @@ export default function DrawerMenu({
             </Text>
           </View>
         </ScrollView>
-      </SafeAreaView>
+      </View>
     </Modal>
   );
 }

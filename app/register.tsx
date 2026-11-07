@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-
 import {
   View,
   Text,
@@ -8,13 +7,22 @@ import {
   StyleSheet,
   ScrollView,
   Alert,
+  Platform,
+  StatusBar,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { router } from "expo-router";
 
 import { COLORS } from "../constants/colors";
 
 export default function RegisterScreen() {
+  const insets = useSafeAreaInsets();
+  const topPadding = Math.max(
+    insets.top,
+    Platform.OS === "android" ? (StatusBar.currentHeight || 28) : 0
+  );
+
   const [name, setName] = useState("");
 
   const [email, setEmail] = useState("");
@@ -55,7 +63,7 @@ export default function RegisterScreen() {
 
   return (
     <ScrollView
-      contentContainerStyle={styles.container}
+      contentContainerStyle={[styles.container, { paddingTop: topPadding + 16 }]}
     >
       <TouchableOpacity onPress={() => router.back()}>
         <Text style={styles.back}>← Back</Text>

@@ -1,0 +1,431 @@
+import React, { useState } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  SafeAreaView,
+  TextInput,
+  TouchableOpacity,
+  Alert,
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { router, useLocalSearchParams } from "expo-router";
+import { THEME } from "../src/constants/theme";
+import { HERO_MEMBERS, POPULAR_SKILLS } from "../src/constants/mockData";
+import { TeamMember } from "../src/types";
+
+export default function TeamsScreen() {
+  const params = useLocalSearchParams<{ skill?: string }>();
+  const [search, setSearch] = useState(params.skill || "");
+  const [selectedFilter, setSelectedFilter] = useState(params.skill || "All");
+  const [invitedMap, setInvitedMap] = useState<Record<string, boolean>>({});
+
+  const filterOptions = ["All", ...POPULAR_SKILLS];
+
+  const filteredMembers = HERO_MEMBERS.filter((m) => {
+    const matchesFilter =
+      selectedFilter === "All" ||
+      m.skills.some((s) => s.toLowerCase() === selectedFilter.toLowerCase());
+    const matchesSearch =
+      m.name.toLowerCase().includes(search.toLowerCase()) ||
+      m.role.toLowerCase().includes(search.toLowerCase()) ||
+      m.skills.some((s) => s.toLowerCase().includes(search.toLowerCase()));
+    return matchesFilter && matchesSearch;
+  });
+
+  const handleInvite = (m: TeamMember) => {
+    setInvitedMap((prev) => ({ ...prev, [m.id]: true }));
+    Alert.alert(
+      "Invitation Sent! 📨",
+      `An invite to collaborate on your team has been sent to ${m.name}.`
+    );
+  };
+
+  return (
+    <SafeAreaView style={styles.container}>
+      {/* Top Header */}
+      <View style={styles.header}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+          <Ionicons name="arrow-back" size={22} color={THEME.inkDark} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Find Teammates</Text>
+        <View style={{ width: 36 }} />
+      </View>
+
+      {/* Search Bar */}
+      <View style={styles.searchWrap}>
+        <Ionicons name="search-outline" size={18} color={THEME.textMuted} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search by skill, developer name, or role..."
+          placeholderTextColor={THEME.textMuted}
+          value={search}
+          onChangeText={setSearch}
+        />
+        {search.length > 0 && (
+          <TouchableOpacity onPress={() => setSearch("")}>
+            <Ionicons name="close-circle" size={18} color={THEME.textMuted} />
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {/* Skills Filters */}
+      <View style={styles.skillsFilterWrap}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.skillsFilterScroll}
+        >
+          {filterOptions.map((f) => {
+            const isSel = selectedFilter === f;
+            return (
+              <TouchableOpacity
+                key={f}
+                style={[styles.filterPill, isSel && styles.filterPillActive]}
+                onPress={() => setSelectedFilter(f)}
+              >
+                <Text
+                  style={[
+                    styles.filterPillText,
+                    isSel && styles.filterPillTextActive,
+                  ]}
+                >
+                  {f}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      </View>
+
+      {/* Member Cards List */}
+      <ScrollView
+        contentContainerStyle={styles.listContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <Text style={styles.resultsCount}>
+          Found {filteredMembers.length} verified candidates
+        </Text>
+
+        {filteredMembers.map((member) => {
+          const isInvited = invitedMap[member.id];
+
+          return (
+            <View key={member.id} style={styles.memberCard}>
+              <View style={styles.cardHeader}>
+                <View
+                  style={[
+                    styles.avatar,
+                    { backgroundColor: member.gradient[0] },
+                  ]}
+                >
+                  <Text style={styles.avatarText}>{member.initials}</Text>
+                </View>
+
+                <View style={{ flex: 1 }}>
+                  <View style={styles.nameRow}>
+                    <Text style={styles.memberName}>{member.name}</Text>
+                    <View style={styles.matchBadge}>
+                      <Text style={styles.matchBadgeText}>
+                        {member.matchPct}% Match
+                      </Text>
+                    </View>
+                  </View>
+
+                  <Text style={styles.memberRole}>{member.role}</Text>
+
+                  <View style={styles.uniRow}>
+                    {member.university && (
+                      <View style={styles.uniPill}>
+                        <Ionicons
+                          name="school-outline"
+                          size={11}
+                          color={THEME.textSecondary}
+                        />
+                        <Text style={styles.uniText}>{member.university}</Text>
+                      </View>
+                    )}
+
+                    <View style={styles.ratingPill}>
+                      <Ionicons name="star" size={12} color="#F59E0B" />
+                      <Text style={styles.ratingText}>{member.rating}</Text>
+                      <Text style={styles.reviewCount}>
+                        ({member.reviewCount} reviews)
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              </View>
+
+              <Text style={styles.memberBio}>{member.bio}</Text>
+
+              {/* Skills tags */}
+              <View style={styles.skillsWrap}>
+                {member.skills.map((s) => (
+                  <View key={s} style={styles.skillBadge}>
+                    <Text style={styles.skillBadgeText}>{s}</Text>
+                  </View>
+                ))}
+              </View>
+
+              {/* Action row */}
+              <View style={styles.actionRow}>
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  style={[styles.inviteBtn, isInvited && styles.invitedBtn]}
+                  onPress={() => !isInvited && handleInvite(member)}
+                  disabled={isInvited}
+                >
+                  <Ionicons
+                    name={isInvited ? "checkmark-circle" : "paper-plane-outline"}
+                    size={15}
+                    color={isInvited ? THEME.successGreen : THEME.white}
+                  />
+                  <Text
+                    style={[
+                      styles.inviteBtnText,
+                      isInvited && styles.invitedBtnText,
+                    ]}
+                  >
+                    {isInvited ? "Invitation Sent" : "Invite to Team"}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          );
+        })}
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: THEME.canvasLight,
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: THEME.white,
+    borderBottomWidth: 1,
+    borderBottomColor: THEME.cardBorder,
+  },
+  backBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: THEME.canvasLight,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: "900",
+    color: THEME.inkDark,
+  },
+  searchWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: THEME.white,
+    marginHorizontal: 16,
+    marginTop: 14,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: THEME.cardBorder,
+    gap: 8,
+  },
+  searchInput: {
+    flex: 1,
+    height: 44,
+    fontSize: 13,
+    color: THEME.inkDark,
+    fontWeight: "600",
+  },
+  skillsFilterWrap: {
+    marginTop: 10,
+  },
+  skillsFilterScroll: {
+    paddingHorizontal: 16,
+    gap: 8,
+  },
+  filterPill: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: THEME.white,
+    borderWidth: 1,
+    borderColor: THEME.cardBorder,
+  },
+  filterPillActive: {
+    backgroundColor: THEME.brandPink,
+    borderColor: THEME.brandPink,
+  },
+  filterPillText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: THEME.textSecondary,
+  },
+  filterPillTextActive: {
+    color: THEME.white,
+  },
+  listContent: {
+    padding: 16,
+    paddingBottom: 30,
+    gap: 14,
+  },
+  resultsCount: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: THEME.textMuted,
+    marginBottom: 2,
+  },
+  memberCard: {
+    backgroundColor: THEME.white,
+    borderRadius: 20,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: THEME.cardBorder,
+    shadowColor: THEME.inkDark,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 2,
+  },
+  cardHeader: {
+    flexDirection: "row",
+    gap: 12,
+    marginBottom: 10,
+  },
+  avatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  avatarText: {
+    color: THEME.white,
+    fontSize: 16,
+    fontWeight: "900",
+  },
+  nameRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  memberName: {
+    fontSize: 17,
+    fontWeight: "900",
+    color: THEME.inkDark,
+  },
+  matchBadge: {
+    backgroundColor: THEME.pastelPink,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+  },
+  matchBadgeText: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: THEME.brandPink,
+  },
+  memberRole: {
+    fontSize: 12,
+    color: THEME.textSecondary,
+    fontWeight: "600",
+    marginTop: 2,
+  },
+  uniRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginTop: 6,
+  },
+  uniPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: THEME.canvasLight,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  uniText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: THEME.textSecondary,
+  },
+  ratingPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+  },
+  ratingText: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: THEME.inkDark,
+  },
+  reviewCount: {
+    fontSize: 11,
+    color: THEME.textMuted,
+  },
+  memberBio: {
+    fontSize: 13,
+    lineHeight: 18,
+    color: THEME.textSecondary,
+    marginBottom: 12,
+  },
+  skillsWrap: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    marginBottom: 14,
+  },
+  skillBadge: {
+    backgroundColor: THEME.pastelViolet,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 8,
+  },
+  skillBadgeText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: THEME.accentViolet,
+  },
+  actionRow: {
+    borderTopWidth: 1,
+    borderTopColor: THEME.cardBorderSubtle,
+    paddingTop: 12,
+  },
+  inviteBtn: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: THEME.brandPink,
+    paddingVertical: 11,
+    borderRadius: 24,
+    shadowColor: THEME.brandPink,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  invitedBtn: {
+    backgroundColor: THEME.pastelMint,
+  },
+  inviteBtnText: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: THEME.white,
+  },
+  invitedBtnText: {
+    color: THEME.successGreen,
+  },
+});

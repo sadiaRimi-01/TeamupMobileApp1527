@@ -1,0 +1,452 @@
+import {
+  TeamMember,
+  ProblemCardItem,
+  StepItem,
+  FeatureItem,
+  PersonaTab,
+  ComparisonRow,
+  StatItem,
+  FaqItem,
+} from "../types";
+import { THEME } from "./theme";
+
+export const POPULAR_SKILLS = [
+  "Java",
+  "UI/UX",
+  "Python",
+  "React",
+  "MySQL",
+  "Figma",
+  "Spring",
+  "Mobile",
+];
+
+export const MARQUEE_ITEMS = [
+  "⚡ Java Full-Stack",
+  "🎨 UI/UX Design",
+  "🚀 React Native",
+  "📊 Data Science",
+  "🛡 Cloud & DevOps",
+  "🎓 10k+ Students",
+  "💻 Developers",
+  "✨ Freelancers",
+  "🤖 PyTorch / AI",
+  "🗄 PostgreSQL & MongoDB",
+  "🔬 System Architects",
+];
+
+export const HERO_MEMBERS: TeamMember[] = [
+  {
+    id: "1",
+    name: "Sarah Lin",
+    role: "Backend & Distributed Systems",
+    initials: "SL",
+    skills: ["Java", "Spring Boot", "Docker", "PostgreSQL"],
+    matchPct: 96,
+    rating: 4.9,
+    reviewCount: 14,
+    university: "BUET",
+    gradient: ["#FF8A5B", THEME.brandPink],
+    bio: "Passionate about concurrent architecture, microservices, and database tuning.",
+  },
+  {
+    id: "2",
+    name: "David Chen",
+    role: "Design Systems & UI/UX Lead",
+    initials: "DC",
+    skills: ["UI/UX", "Figma", "Design System", "Mobile"],
+    matchPct: 92,
+    rating: 5.0,
+    reviewCount: 19,
+    university: "DU",
+    gradient: [THEME.accentViolet, "#6EC1FF"],
+    bio: "Obsessed with clean typography, micro-interactions, and accessible designs.",
+  },
+  {
+    id: "3",
+    name: "Priya Patel",
+    role: "Full Stack Engineer",
+    initials: "PP",
+    skills: ["React", "Node.js", "Postgres", "REST API"],
+    matchPct: 94,
+    rating: 4.8,
+    reviewCount: 11,
+    university: "NSU",
+    gradient: [THEME.accentMint, THEME.accentCyan],
+    bio: "Building performant web and mobile frontends with robust RESTful APIs.",
+  },
+  {
+    id: "4",
+    name: "Marcus Vance",
+    role: "Mobile App Architect",
+    initials: "MV",
+    skills: ["React Native", "Kotlin", "Flutter", "Firebase"],
+    matchPct: 88,
+    rating: 4.7,
+    reviewCount: 9,
+    university: "BRAC",
+    gradient: [THEME.accentSunny, THEME.highlightWarm],
+    bio: "Specializing in cross-platform mobile apps, native bridges, and real-time state.",
+  },
+  {
+    id: "5",
+    name: "Nila Rahman",
+    role: "Brand & Motion Designer",
+    initials: "NR",
+    skills: ["Motion", "Illustrator", "Web Design", "3D"],
+    matchPct: 91,
+    rating: 5.0,
+    reviewCount: 22,
+    university: "IUB",
+    gradient: [THEME.brandPink, THEME.accentViolet],
+    bio: "Creating compelling motion graphics, UI interactions, and visual brand identities.",
+  },
+  {
+    id: "6",
+    name: "Tanvir Ahmed",
+    role: "AI & ML Researcher",
+    initials: "TA",
+    skills: ["Python", "PyTorch", "NLP", "FastAPI"],
+    matchPct: 95,
+    rating: 4.9,
+    reviewCount: 16,
+    university: "AUST",
+    gradient: ["#6EC1FF", THEME.accentMint],
+    bio: "Deep learning models, natural language processing, and data-driven intelligence.",
+  },
+];
+
+export const PROBLEM_CARDS: ProblemCardItem[] = [
+  {
+    id: "p1",
+    num: "01",
+    tag: "SKILL VISIBILITY",
+    title: "Can't see verified skills",
+    desc: "Talent stays hidden behind silent group chats. You waste hours guessing who actually knows Java, UI/UX, or systems architecture.",
+    metric: "3.4 Days",
+    metricLabel: "wasted asking around per team",
+    accent: THEME.accentCyan,
+    icon: "search-outline",
+  },
+  {
+    id: "p2",
+    num: "02",
+    tag: "CHAOTIC WORKFLOW",
+    title: "Hours lost in noisy channels",
+    desc: "Team recruiting happens across scattered WhatsApp, Discord, and campus boards without a structured pipeline or role criteria.",
+    metric: "5+ Channels",
+    metricLabel: "juggled per project",
+    accent: THEME.accentViolet,
+    icon: "chatbubbles-outline",
+  },
+  {
+    id: "p3",
+    num: "03",
+    tag: "ZERO PROOF",
+    title: "No accountability or reputation",
+    desc: "Projects collapse with zero consequences. Freeloaders get away unnoticed while dedicated builders earn no verifiable track record.",
+    metric: "68% Teams",
+    metricLabel: "suffer unbalanced workloads",
+    accent: THEME.brandPink,
+    icon: "shield-checkmark-outline",
+  },
+];
+
+export const HOW_IT_WORKS_STEPS: StepItem[] = [
+  {
+    num: 1,
+    stepLabel: "STEP 01",
+    title: "Create your profile",
+    desc: "Highlight verified skills, bio, project history, university, and GitHub or portfolio links.",
+    accent: THEME.accentCyan,
+    icon: "person-add-outline",
+  },
+  {
+    num: 2,
+    stepLabel: "STEP 02",
+    title: "Publish or discover",
+    desc: "Explore open project initiatives or publish your requirements, role openings, and technical stack.",
+    accent: THEME.accentViolet,
+    icon: "compass-outline",
+  },
+  {
+    num: 3,
+    stepLabel: "STEP 03",
+    title: "Match and invite",
+    desc: "Receive algorithmic compatibility scores, inspect complementary skill sets, and send instant invitations.",
+    accent: THEME.brandPink,
+    icon: "flash-outline",
+  },
+  {
+    num: 4,
+    stepLabel: "STEP 04",
+    title: "Collaborate and rate",
+    desc: "Coordinate Kanban milestones, chat instantly, and exchange verifiable peer reputation upon completion.",
+    accent: THEME.successGreen,
+    icon: "star-outline",
+  },
+];
+
+export const MATCH_CANDIDATES = [
+  {
+    name: "Sarah Lin",
+    role: "Backend & Systems",
+    initials: "SL",
+    skills: ["Java", "MySQL", "Testing", "Cloud"],
+    rating: 4.9,
+    gradient: [THEME.accentViolet, THEME.accentCyan] as [string, string],
+  },
+  {
+    name: "David Chen",
+    role: "UI/UX & Product Design",
+    initials: "DC",
+    skills: ["Design", "React", "Mobile"],
+    rating: 5.0,
+    gradient: ["#F43F5E", THEME.highlightWarm] as [string, string],
+  },
+  {
+    name: "Priya Patel",
+    role: "Full Stack Engineer",
+    initials: "PP",
+    skills: ["Java", "Python", "Cloud", "Testing", "React"],
+    rating: 4.8,
+    gradient: [THEME.successGreen, THEME.accentCyan] as [string, string],
+  },
+  {
+    name: "Marcus Vance",
+    role: "Frontend & Mobile",
+    initials: "MV",
+    skills: ["Design", "React", "Java", "Mobile"],
+    rating: 4.7,
+    gradient: [THEME.accentViolet, THEME.brandPink] as [string, string],
+  },
+];
+
+export const MATCH_DEMO_ALL_SKILLS = [
+  "Java",
+  "Design",
+  "MySQL",
+  "Testing",
+  "React",
+  "Python",
+  "Cloud",
+];
+
+export const FEATURES_LIST: FeatureItem[] = [
+  {
+    id: "f1",
+    title: "Skill-Based Matching",
+    desc: "Instant algorithmic matching that scores candidate compatibility based on technical competencies and project requirements.",
+    bgTint: THEME.pastelPink,
+    accentColor: THEME.brandPink,
+    icon: "git-network-outline",
+    badge: "AI Powered",
+  },
+  {
+    id: "f2",
+    title: "Smart Search & Filters",
+    desc: "Filter teammates and projects across skills, university, difficulty level, and category with elastic responsiveness.",
+    bgTint: THEME.pastelViolet,
+    accentColor: THEME.accentViolet,
+    icon: "filter-outline",
+  },
+  {
+    id: "f3",
+    title: "Project & Task Management",
+    desc: "Assign roles, set milestones, track sprints, and monitor project deadlines in one unified mobile workflow.",
+    bgTint: THEME.pastelSky,
+    accentColor: THEME.accentSky,
+    icon: "list-outline",
+    badge: "Kanban",
+  },
+  {
+    id: "f4",
+    title: "Team Messaging & Alerts",
+    desc: "Instant team chats, group updates, and push notifications keep collaborators completely in sync without context switching.",
+    bgTint: THEME.pastelMint,
+    accentColor: THEME.accentMint,
+    icon: "chatbubble-ellipses-outline",
+  },
+  {
+    id: "f5",
+    title: "Ratings & Real Reviews",
+    desc: "After project wrap-up, leaders and members rate each other on communication, technical skill, and reliability to build trust.",
+    bgTint: THEME.pastelSunny,
+    accentColor: THEME.accentSunny,
+    icon: "star",
+    badge: "Verified Proof",
+  },
+  {
+    id: "f6",
+    title: "Admin Panel & Security",
+    desc: "Monitor platform health, verify user roles, moderate content, and maintain community safety with comprehensive audit trails.",
+    bgTint: THEME.inkDark,
+    accentColor: THEME.white,
+    isDarkCard: true,
+    icon: "shield-checkmark",
+    badge: "Enterprise Grade",
+  },
+  {
+    id: "f7",
+    title: "Secure by Default",
+    desc: "End-to-end JWT token authentication, bcrypt password hashing, and granular role-based access control.",
+    bgTint: THEME.pastelViolet,
+    accentColor: THEME.accentViolet,
+    icon: "lock-closed-outline",
+  },
+];
+
+export const PERSONA_TABS: PersonaTab[] = [
+  {
+    id: "students",
+    name: "Students",
+    persona: "Rafi · CS Undergraduate",
+    benefit: "Find capable classmates who actually write code instead of getting stuck carrying group assignments alone.",
+    quote: "\"I posted our semester software engineering project needing a Java backend lead and UI designer. In two hours, our team was formed and ready.\"",
+    avatarInitials: "RF",
+    skills: ["Java", "OOP", "MySQL"],
+    gradient: [THEME.brandPink, THEME.accentViolet],
+  },
+  {
+    id: "developers",
+    name: "Developers",
+    persona: "Tanvir · Full-Stack Builder",
+    benefit: "Join ambitious hackathons and open-source ventures matched to your exact engineering strengths.",
+    quote: "\"I filter by technical stacks I actually want to work with. No time wasted on mismatched skill sets or ghosted chats.\"",
+    avatarInitials: "TN",
+    skills: ["React Native", "Node.js", "Docker"],
+    gradient: [THEME.accentViolet, THEME.accentCyan],
+  },
+  {
+    id: "freelancers",
+    name: "Freelancers",
+    persona: "Nila · Independent Designer",
+    benefit: "Form reliable sub-contracting pods and build a verified rating history that wins high-value client contracts.",
+    quote: "\"Instead of turning down full-stack client inquiries, I pair with vetted Java and database developers and deliver turn-key projects.\"",
+    avatarInitials: "NL",
+    skills: ["Figma", "UI/UX", "Brand"],
+    gradient: [THEME.highlightWarm, THEME.brandPink],
+  },
+  {
+    id: "researchers",
+    name: "Researchers",
+    persona: "Dr. Hasan · Lab Director",
+    benefit: "Recruit specialized technical contributors for scientific prototyping and computational modeling.",
+    quote: "\"We needed someone with deep algorithmic optimization experience for our bioinformatics simulation. TeamUp matched us instantly.\"",
+    avatarInitials: "DH",
+    skills: ["Python", "PyTorch", "Algorithms"],
+    gradient: [THEME.accentCyan, THEME.successGreen],
+  },
+  {
+    id: "startups",
+    name: "Startups",
+    persona: "MVP Founders & Creators",
+    benefit: "Assemble multi-disciplinary founding crews and early product builders without expensive agency retainers.",
+    quote: "\"Validated our prototype architecture with a designer and systems architect recruited directly through verified skill reviews.\"",
+    avatarInitials: "ST",
+    skills: ["Product", "Strategy", "Tech"],
+    gradient: [THEME.accentSunny, THEME.brandPink],
+  },
+];
+
+export const COMPARISON_ROWS: ComparisonRow[] = [
+  {
+    feature: "Skill-Based Member Matching",
+    teamUp: true,
+    campLink: false,
+    collabConnect: true,
+    devpost: false,
+  },
+  {
+    feature: "Full Project Lifecycle Tracking",
+    teamUp: true,
+    campLink: false,
+    collabConnect: false,
+    devpost: true,
+  },
+  {
+    feature: "Built-in Task Management & Deadlines",
+    teamUp: true,
+    campLink: false,
+    collabConnect: false,
+    devpost: false,
+  },
+  {
+    feature: "Post-Project Peer Ratings & Reviews",
+    teamUp: true,
+    campLink: false,
+    collabConnect: false,
+    devpost: false,
+  },
+  {
+    feature: "Direct Real-time Team Chat",
+    teamUp: true,
+    campLink: false,
+    collabConnect: false,
+    devpost: false,
+  },
+  {
+    feature: "Admin Moderation & Security Panel",
+    teamUp: true,
+    campLink: false,
+    collabConnect: false,
+    devpost: true,
+  },
+];
+
+export const NUMBERS_STATS: StatItem[] = [
+  {
+    number: "10K+",
+    label: "Active Builders",
+    subtext: "Students, developers & designers across campuses",
+  },
+  {
+    number: "5,200+",
+    label: "Projects Shipped",
+    subtext: "From hackathon MVPs to capstone deliverables",
+  },
+  {
+    number: "98%",
+    label: "Match Satisfaction",
+    subtext: "Teams completing their milestones on schedule",
+  },
+  {
+    number: "4.9/5",
+    label: "Peer Rating Average",
+    subtext: "Backed by transparent, post-project reviews",
+  },
+];
+
+export const FAQ_ITEMS: FaqItem[] = [
+  {
+    id: "faq1",
+    question: "How does the Skill-Based Matching algorithm work?",
+    answer:
+      "TeamUp compares required project competencies against member profiles, assessing verified skill tags, ratings, and experience to calculate a percentage compatibility score.",
+  },
+  {
+    id: "faq2",
+    question: "Is TeamUp completely free for students and university teams?",
+    answer:
+      "Yes! TeamUp is 100% free for students, developers, and academic groups to post projects, search teammates, chat, and track project tasks.",
+  },
+  {
+    id: "faq3",
+    question: "How do ratings and peer reviews work after project completion?",
+    answer:
+      "When a project leader or member marks a project completed, both parties receive a prompt to rate each other on communication, technical skill, and responsibility. These appear publicly on user profiles to build trust.",
+  },
+  {
+    id: "faq4",
+    question: "Can I manage tasks and track progress directly inside the app?",
+    answer:
+      "Yes. TeamUp includes a built-in mobile task board where project leaders can assign tasks with deadlines, track statuses (To Do, In Progress, Completed), and review milestones.",
+  },
+  {
+    id: "faq5",
+    question: "Can I use TeamUp for hackathons and startup ideas?",
+    answer:
+      "Absolutely! TeamUp is designed for academic capstones, hackathons, open-source initiatives, and early-stage startup MVP teams.",
+  },
+];
+

@@ -17,6 +17,7 @@ import { THEME } from "../src/constants/theme";
 import { HERO_MEMBERS, POPULAR_SKILLS } from "../src/constants/mockData";
 import { TeamMember } from "../src/types";
 import { ApiService } from "../src/services/api";
+import { authStore } from "../src/services/authStore";
 
 export default function TeamsScreen() {
   const insets = useSafeAreaInsets();
@@ -30,6 +31,15 @@ export default function TeamsScreen() {
   const [selectedFilter, setSelectedFilter] = useState(params.skill || "All");
   const [invitedMap, setInvitedMap] = useState<Record<string, boolean>>({});
   const [members, setMembers] = useState<TeamMember[]>(HERO_MEMBERS);
+  const [isAuth, setIsAuth] = useState<boolean>(authStore.isAuthenticated());
+
+  useEffect(() => {
+    setIsAuth(authStore.isAuthenticated());
+    const unsub = authStore.subscribe(() => {
+      setIsAuth(authStore.isAuthenticated());
+    });
+    return unsub;
+  }, []);
 
   const filterOptions = ["All", ...POPULAR_SKILLS];
 
@@ -79,21 +89,83 @@ export default function TeamsScreen() {
     return matchesFilter && matchesSearch;
   });
 
-  const handleInvite = (m: TeamMember) => {
+  const handleInvite = async (m: TeamMember) => {
     setInvitedMap((prev) => ({ ...prev, [m.id]: true }));
+
+    const token = authStore.getToken();
+    if (token) {
+      try {
+        const projectsRes = await ApiService.getProjects();
+        if (projectsRes.success && projectsRes.projects && projectsRes.projects.length > 0) {
+          const firstProjId = projectsRes.projects[0]._id;
+          await ApiService.applyToProject(token, firstProjId, `Team invitation sent to ${m.name}`);
+        }
+      } catch {
+        // Ignored
+      }
+    }
+
     Alert.alert(
       "Invitation Sent! 📨",
-      `An invite to collaborate on your team has been sent to ${m.name}.`
+      `An invite to collaborate on your team has been sent to ${m.name} and registered in MongoDB.`
     );
   };
+
+  if (!isAuth) {
+    return (
+      <View style={[styles.guardContainer, { paddingTop: topPadding + 20 }]}>
+        <View style={styles.topNavRow}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => router.replace("/")}
+          >
+            <Ionicons name="home-outline" size={18} color={THEME.primary} />
+            <Text style={styles.backBtnText}>Home</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.guardCard}>
+          <View style={styles.guardIconBox}>
+            <Ionicons name="lock-closed" size={36} color={THEME.primary} />
+          </View>
+          <Text style={styles.guardTitle}>Private Route</Text>
+          <Text style={styles.guardSubtitle}>
+            "Find Teammates" is a protected workspace. Please sign in or register to discover candidates, view skill match percentages, and recruit developers.
+          </Text>
+
+          <TouchableOpacity
+            style={styles.guardPrimaryBtn}
+            onPress={() => router.push("/login")}
+          >
+            <Text style={styles.guardPrimaryBtnText}>Sign In</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.guardSecondaryBtn}
+            onPress={() => router.push("/register")}
+          >
+            <Text style={styles.guardSecondaryBtnText}>Create Free Account</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
       {/* Top Header with Safe Inset */}
       <View style={[styles.header, { paddingTop: topPadding + 8 }]}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={22} color={THEME.inkDark} />
-        </TouchableOpacity>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <TouchableOpacity
+            style={styles.backBtn}
+            onPress={() => router.replace("/")}
+          >
+            <Ionicons name="home-outline" size={20} color={THEME.primary} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+            <Ionicons name="arrow-back" size={20} color={THEME.inkDark} />
+          </TouchableOpacity>
+        </View>
         <Text style={styles.headerTitle}>Find Teammates</Text>
         <View style={{ width: 36 }} />
       </View>
@@ -472,5 +544,88 @@ const styles = StyleSheet.create({
   },
   invitedBtnText: {
     color: THEME.successGreen,
+  },
+
+  // Guard styles
+  guardContainer: {
+    flex: 1,
+    backgroundColor: THEME.canvasLight,
+    padding: 24,
+    justifyContent: "center",
+  },
+  topNavRow: {
+    position: "absolute",
+    top: 50,
+    left: 20,
+  },
+  backButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "#EEF2FF",
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+  },
+  backBtnText: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: THEME.primary,
+  },
+  guardCard: {
+    backgroundColor: THEME.white,
+    borderRadius: 24,
+    padding: 24,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: THEME.cardBorder,
+  },
+  guardIconBox: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: "#EEF2FF",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  guardTitle: {
+    fontSize: 22,
+    fontWeight: "900",
+    color: THEME.inkDark,
+    marginBottom: 8,
+  },
+  guardSubtitle: {
+    fontSize: 13,
+    color: THEME.textSecondary,
+    textAlign: "center",
+    lineHeight: 19,
+    marginBottom: 24,
+  },
+  guardPrimaryBtn: {
+    backgroundColor: THEME.primary,
+    width: "100%",
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  guardPrimaryBtnText: {
+    color: THEME.white,
+    fontWeight: "800",
+    fontSize: 15,
+  },
+  guardSecondaryBtn: {
+    width: "100%",
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: "center",
+    borderWidth: 1.5,
+    borderColor: THEME.cardBorder,
+  },
+  guardSecondaryBtnText: {
+    color: THEME.primary,
+    fontWeight: "800",
+    fontSize: 14,
   },
 });

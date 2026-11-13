@@ -77,9 +77,17 @@ export default function NotificationsScreen() {
   return (
     <View style={styles.container}>
       <View style={[styles.header, { paddingTop: topPadding + 8 }]}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={22} color={THEME.inkDark} />
-        </TouchableOpacity>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <TouchableOpacity
+            style={styles.backBtn}
+            onPress={() => router.replace("/")}
+          >
+            <Ionicons name="home-outline" size={20} color={THEME.primary} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+            <Ionicons name="arrow-back" size={20} color={THEME.inkDark} />
+          </TouchableOpacity>
+        </View>
         <Text style={styles.headerTitle}>Notifications</Text>
         <TouchableOpacity style={styles.backBtn}>
           <Ionicons name="checkmark-done-outline" size={20} color={THEME.brandPink} />

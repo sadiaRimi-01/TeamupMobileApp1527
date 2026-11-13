@@ -90,6 +90,7 @@ export default function ProjectsScreen() {
   const [appliedProjects, setAppliedProjects] = useState<Record<string, boolean>>({});
   const [projects, setProjects] = useState<ProjectItem[]>(SAMPLE_PROJECTS);
   const [loading, setLoading] = useState(false);
+  const [isAuth, setIsAuth] = useState<boolean>(authStore.isAuthenticated());
 
   // Post Project Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -100,6 +101,14 @@ export default function ProjectsScreen() {
   const [newTeamSize, setNewTeamSize] = useState("4");
   const [newDeadline, setNewDeadline] = useState("Dec 30, 2026");
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    setIsAuth(authStore.isAuthenticated());
+    const unsub = authStore.subscribe(() => {
+      setIsAuth(authStore.isAuthenticated());
+    });
+    return unsub;
+  }, []);
 
   const categories = ["All", "Mobile & AI", "Full Stack & Cloud", "UI/UX & Web", "Machine Learning"];
 
@@ -243,13 +252,61 @@ export default function ProjectsScreen() {
     }
   };
 
+  if (!isAuth) {
+    return (
+      <View style={[styles.guardContainer, { paddingTop: topPadding + 20 }]}>
+        <View style={styles.topNavRow}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => router.replace("/")}
+          >
+            <Ionicons name="home-outline" size={18} color={THEME.primary} />
+            <Text style={styles.backBtnText}>Home</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.guardCard}>
+          <View style={styles.guardIconBox}>
+            <Ionicons name="lock-closed" size={36} color={THEME.primary} />
+          </View>
+          <Text style={styles.guardTitle}>Private Route</Text>
+          <Text style={styles.guardSubtitle}>
+            "Explore Projects" is a protected workspace. Please sign in or register to browse projects, apply to teams, and recruit developers.
+          </Text>
+
+          <TouchableOpacity
+            style={styles.guardPrimaryBtn}
+            onPress={() => router.push("/login")}
+          >
+            <Text style={styles.guardPrimaryBtnText}>Sign In</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.guardSecondaryBtn}
+            onPress={() => router.push("/register")}
+          >
+            <Text style={styles.guardSecondaryBtnText}>Create Free Account</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       {/* Top Header with Safe Area Inset */}
       <View style={[styles.header, { paddingTop: topPadding + 8 }]}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={22} color={THEME.inkDark} />
-        </TouchableOpacity>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <TouchableOpacity
+            style={styles.backBtn}
+            onPress={() => router.replace("/")}
+          >
+            <Ionicons name="home-outline" size={20} color={THEME.primary} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+            <Ionicons name="arrow-back" size={20} color={THEME.inkDark} />
+          </TouchableOpacity>
+        </View>
         <Text style={styles.headerTitle}>Explore Projects</Text>
         <TouchableOpacity
           style={styles.postBtn}
@@ -795,5 +852,88 @@ const styles = StyleSheet.create({
     color: THEME.white,
     fontWeight: "800",
     fontSize: 15,
+  },
+
+  // Guard styles
+  guardContainer: {
+    flex: 1,
+    backgroundColor: THEME.canvasLight,
+    padding: 24,
+    justifyContent: "center",
+  },
+  topNavRow: {
+    position: "absolute",
+    top: 50,
+    left: 20,
+  },
+  backButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "#EEF2FF",
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+  },
+  backBtnText: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: THEME.primary,
+  },
+  guardCard: {
+    backgroundColor: THEME.white,
+    borderRadius: 24,
+    padding: 24,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: THEME.cardBorder,
+  },
+  guardIconBox: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: "#EEF2FF",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  guardTitle: {
+    fontSize: 22,
+    fontWeight: "900",
+    color: THEME.inkDark,
+    marginBottom: 8,
+  },
+  guardSubtitle: {
+    fontSize: 13,
+    color: THEME.textSecondary,
+    textAlign: "center",
+    lineHeight: 19,
+    marginBottom: 24,
+  },
+  guardPrimaryBtn: {
+    backgroundColor: THEME.primary,
+    width: "100%",
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  guardPrimaryBtnText: {
+    color: THEME.white,
+    fontWeight: "800",
+    fontSize: 15,
+  },
+  guardSecondaryBtn: {
+    width: "100%",
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: "center",
+    borderWidth: 1.5,
+    borderColor: THEME.cardBorder,
+  },
+  guardSecondaryBtnText: {
+    color: THEME.primary,
+    fontWeight: "800",
+    fontSize: 14,
   },
 });

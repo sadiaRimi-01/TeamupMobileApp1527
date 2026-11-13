@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   StyleSheet,
@@ -13,6 +13,7 @@ import { router } from "expo-router";
 import { THEME } from "../../constants/theme";
 import TeamUpLogo from "../common/TeamUpLogo";
 import Button from "../common/Button";
+import { authStore, AuthUser } from "../../services/authStore";
 
 interface HeaderNavProps {
   onMenuPress: () => void;
@@ -29,7 +30,20 @@ export default function HeaderNav({
   const handleLogin = onLoginPress || (() => router.push("/login"));
   const handleRegister = onRegisterPress || (() => router.push("/register"));
 
-  // Ensure ample clearance for the Android & iOS status bar (clock, battery, notch)
+  const [user, setUser] = useState<AuthUser | null>(authStore.getUser());
+  const [isAuth, setIsAuth] = useState<boolean>(authStore.isAuthenticated());
+
+  useEffect(() => {
+    setUser(authStore.getUser());
+    setIsAuth(authStore.isAuthenticated());
+
+    const unsub = authStore.subscribe(() => {
+      setUser(authStore.getUser());
+      setIsAuth(authStore.isAuthenticated());
+    });
+    return unsub;
+  }, []);
+
   const topPadding = Math.max(
     insets.top,
     Platform.OS === "android" ? (StatusBar.currentHeight || 28) : 0
@@ -51,20 +65,39 @@ export default function HeaderNav({
         </View>
 
         <View style={styles.right}>
-          <TouchableOpacity
-            activeOpacity={0.7}
-            style={styles.loginTextBtn}
-            onPress={handleLogin}
-          >
-            <Text style={styles.loginText}>Sign In</Text>
-          </TouchableOpacity>
+          {isAuth && user ? (
+            <TouchableOpacity
+              activeOpacity={0.8}
+              style={styles.userProfilePill}
+              onPress={() => router.push("/profile")}
+            >
+              <View style={styles.userInitialCircle}>
+                <Text style={styles.userInitialText}>
+                  {user.avatarInitials || user.name.substring(0, 2).toUpperCase()}
+                </Text>
+              </View>
+              <Text style={styles.userPillName} numberOfLines={1}>
+                {user.name.split(" ")[0]}
+              </Text>
+            </TouchableOpacity>
+          ) : (
+            <>
+              <TouchableOpacity
+                activeOpacity={0.7}
+                style={styles.loginTextBtn}
+                onPress={handleLogin}
+              >
+                <Text style={styles.loginText}>Sign In</Text>
+              </TouchableOpacity>
 
-          <Button
-            title="Join"
-            size="sm"
-            variant="primary"
-            onPress={handleRegister}
-          />
+              <Button
+                title="Join"
+                size="sm"
+                variant="primary"
+                onPress={handleRegister}
+              />
+            </>
+          )}
         </View>
       </View>
     </View>
@@ -100,22 +133,52 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: THEME.pastelPink,
+    backgroundColor: THEME.canvasLight,
     justifyContent: "center",
     alignItems: "center",
   },
   right: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: 10,
   },
   loginTextBtn: {
-    paddingHorizontal: 8,
-    paddingVertical: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
   },
   loginText: {
     fontSize: 14,
     fontWeight: "700",
-    color: THEME.textPrimary,
+    color: THEME.inkDark,
+  },
+  userProfilePill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    backgroundColor: "#EEF2FF",
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: THEME.cardBorder,
+  },
+  userInitialCircle: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: THEME.primary,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  userInitialText: {
+    color: THEME.white,
+    fontSize: 11,
+    fontWeight: "900",
+  },
+  userPillName: {
+    color: THEME.primary,
+    fontWeight: "800",
+    fontSize: 13,
+    maxWidth: 90,
   },
 });

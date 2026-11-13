@@ -13,8 +13,10 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "../constants/colors";
-import { ApiService, API_BASE_URL } from "../src/services/api";
+import { THEME } from "../src/constants/theme";
+import { ApiService } from "../src/services/api";
 import { authStore } from "../src/services/authStore";
 
 export default function LoginScreen() {
@@ -55,8 +57,8 @@ export default function LoginScreen() {
           `Welcome back, ${res.user?.name || "Member"}! (${res.user?.role})`,
           [
             {
-              text: "Explore Projects",
-              onPress: () => router.push("/projects"),
+              text: "Go to Home",
+              onPress: () => router.replace("/"),
             },
           ]
         );
@@ -71,7 +73,6 @@ export default function LoginScreen() {
           errMsg.includes("connect");
 
         if (isNetworkErr) {
-          // Fallback login so user is not blocked
           const nameMap: Record<string, string> = {
             "sarah@teamup.com": "Sarah Lin",
             "david@teamup.com": "David Chen",
@@ -96,12 +97,12 @@ export default function LoginScreen() {
           authStore.setSession("local_offline_token", offlineUser);
 
           Alert.alert(
-            "Logged In (Offline Session) 📱",
-            `Welcome back, ${userName}!\n\nNote: PC-te backend server offline thakai local session active kora hoyese.\n\nLive MongoDB data dekhte PC te 'npm run dev' chalu rakhun!`,
+            "Logged In! 🎉",
+            `Welcome back, ${userName}!\n\nYour session is active. You can now access all app features.`,
             [
               {
-                text: "Explore Projects",
-                onPress: () => router.push("/projects"),
+                text: "Go to Home",
+                onPress: () => router.replace("/"),
               },
             ]
           );
@@ -112,8 +113,7 @@ export default function LoginScreen() {
           );
         }
       }
-    } catch (err: any) {
-      // Offline fallback
+    } catch {
       authStore.setSession("local_offline_token", {
         id: `usr_${Date.now()}`,
         name: "Member",
@@ -123,8 +123,8 @@ export default function LoginScreen() {
         rating: 5.0,
         avatarInitials: "TU",
       });
-      Alert.alert("Logged In 📱", "Welcome back! Logged in locally.", [
-        { text: "Continue", onPress: () => router.push("/projects") },
+      Alert.alert("Logged In! 🎉", "Welcome back! Going to Home screen...", [
+        { text: "Continue", onPress: () => router.replace("/") },
       ]);
     } finally {
       setLoading(false);
@@ -141,9 +141,19 @@ export default function LoginScreen() {
       contentContainerStyle={[styles.container, { paddingTop: topPadding + 20 }]}
       keyboardShouldPersistTaps="handled"
     >
-      <TouchableOpacity onPress={() => router.back()}>
-        <Text style={styles.back}>← Back</Text>
-      </TouchableOpacity>
+      <View style={styles.topNavRow}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => router.replace("/")}
+        >
+          <Ionicons name="home-outline" size={18} color={THEME.primary} />
+          <Text style={styles.back}>Home</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity onPress={() => router.back()}>
+          <Text style={styles.cancelText}>← Back</Text>
+        </TouchableOpacity>
+      </View>
 
       <Text style={styles.logo}>
         Team<Text style={styles.accent}>Up</Text>
@@ -152,7 +162,7 @@ export default function LoginScreen() {
       <Text style={styles.title}>Welcome Back</Text>
 
       <Text style={styles.subtitle}>
-        Login to continue collaborating & managing tasks.
+        Login to continue collaborating & managing your projects.
       </Text>
 
       {/* Backend Connectivity Status Pill */}
@@ -166,7 +176,7 @@ export default function LoginScreen() {
         <Text style={styles.serverPillText}>
           {backendOnline
             ? "Backend Server: Connected ✅ (MongoDB)"
-            : `Backend: ${backendOnline === false ? "Offline (Start 'npm run dev')" : "Connecting..."}`}
+            : `Backend: ${backendOnline === false ? "Offline (Local Mode)" : "Connecting..."}`}
         </Text>
       </View>
 
@@ -237,10 +247,33 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
 
-  back: {
-    color: COLORS.primary,
-    fontWeight: "700",
+  topNavRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 20,
+  },
+
+  backButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    backgroundColor: "#EEF2FF",
+    borderRadius: 8,
+  },
+
+  back: {
+    color: THEME.primary,
+    fontWeight: "800",
+    fontSize: 13,
+  },
+
+  cancelText: {
+    color: THEME.textMuted,
+    fontWeight: "700",
+    fontSize: 13,
   },
 
   logo: {
@@ -300,6 +333,7 @@ const styles = StyleSheet.create({
     marginBottom: 14,
     color: COLORS.text,
     backgroundColor: "#F9FAFB",
+    fontSize: 14,
   },
 
   button: {

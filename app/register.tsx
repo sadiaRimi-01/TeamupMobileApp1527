@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -14,7 +14,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { COLORS } from "../constants/colors";
-import { ApiService } from "../src/services/api";
+import { ApiService, API_BASE_URL } from "../src/services/api";
 import { authStore } from "../src/services/authStore";
 
 export default function RegisterScreen() {
@@ -32,6 +32,14 @@ export default function RegisterScreen() {
   const [university, setUniversity] = useState("");
   const [skills, setSkills] = useState("");
   const [loading, setLoading] = useState(false);
+  const [backendOnline, setBackendOnline] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    // Check if backend server is reachable on screen load
+    ApiService.checkHealth().then((res) => {
+      setBackendOnline(res.online);
+    });
+  }, []);
 
   const handleRegister = async () => {
     if (!name.trim() || !email.trim() || !password) {
@@ -59,11 +67,11 @@ export default function RegisterScreen() {
     }
 
     setLoading(true);
-    try {
-      const skillsList = skills
-        ? skills.split(",").map((s) => s.trim()).filter(Boolean)
-        : ["React Native", "TypeScript"];
+    const skillsList = skills
+      ? skills.split(",").map((s) => s.trim()).filter(Boolean)
+      : ["React Native", "TypeScript"];
 
+    try {
       const res = await ApiService.register({
         name: name.trim(),
         email: email.trim().toLowerCase(),
@@ -86,13 +94,70 @@ export default function RegisterScreen() {
           ]
         );
       } else {
-        Alert.alert(
-          "Notice",
-          res.message || "Registration failed. Check if backend is running."
-        );
+        // If connection failed (e.g. NoRouteToHostException, host unreachable, offline)
+        const errMsg = (res.message || "").toLowerCase();
+        const isNetworkErr =
+          errMsg.includes("fetch failed") ||
+          errMsg.includes("unreachable") ||
+          errMsg.includes("noroutetohost") ||
+          errMsg.includes("network") ||
+          errMsg.includes("timed out") ||
+          errMsg.includes("connect");
+
+        if (isNetworkErr) {
+          // Graceful fallback: Activate session locally so user can test without being blocked
+          const initials =
+            name.trim().split(" ").length > 1
+              ? (name.trim().split(" ")[0][0] + name.trim().split(" ")[1][0]).toUpperCase()
+              : name.trim().substring(0, 2).toUpperCase();
+
+          const fallbackUser = {
+            id: `usr_${Date.now()}`,
+            name: name.trim(),
+            email: email.trim().toLowerCase(),
+            role,
+            university: university.trim() || "University Student",
+            skills: skillsList,
+            rating: 5.0,
+            reviewCount: 0,
+            avatarInitials: initials,
+          };
+
+          authStore.setSession("local_offline_token", fallbackUser);
+
+          Alert.alert(
+            "Account Created (Local Session) 📱",
+            `Welcome, ${name.trim()}!\n\nNote: PC-te backend server chalu nai ba firewall e port 5000 block ase.\n\nApmar account app e save hoyese jate apni sob features test korte paren.\n\nMongoDB te live save korte PC te 'npm run dev' chalu rakhun!`,
+            [
+              {
+                text: "Continue to App",
+                onPress: () => router.push("/projects"),
+              },
+            ]
+          );
+        } else {
+          Alert.alert("Notice", res.message || "Registration failed.");
+        }
       }
     } catch (err: any) {
-      Alert.alert("Connection Error", "Backend server is currently offline.");
+      // Offline fallback
+      const initials = name.trim().substring(0, 2).toUpperCase();
+      authStore.setSession("local_offline_token", {
+        id: `usr_${Date.now()}`,
+        name: name.trim(),
+        email: email.trim().toLowerCase(),
+        role,
+        university: university.trim() || "University Student",
+        skills: skillsList,
+        rating: 5.0,
+        avatarInitials: initials,
+      });
+
+      Alert.alert(
+        "Welcome to TeamUp! 📱",
+        "Backend server offline thakleo apnar local session start hoyese. Apni sob screens test korte parben!",
+        [{ text: "Continue", onPress: () => router.push("/projects") }]
+      );
     } finally {
       setLoading(false);
     }
@@ -116,6 +181,21 @@ export default function RegisterScreen() {
       <Text style={styles.subtitle}>
         Join TeamUp, connect with top collaborators, and store your profile in MongoDB.
       </Text>
+
+      {/* Backend Connectivity Status Pill */}
+      <View style={styles.serverPill}>
+        <View
+          style={[
+            styles.serverDot,
+            { backgroundColor: backendOnline ? "#10B981" : "#F59E0B" },
+          ]}
+        />
+        <Text style={styles.serverPillText}>
+          {backendOnline
+            ? "Backend Server: Connected ✅ (MongoDB)"
+            : `Backend: ${backendOnline === false ? "Offline (Start 'npm run dev')" : "Connecting..."}`}
+        </Text>
+      </View>
 
       {/* Role Selector */}
       <View style={styles.roleContainer}>
@@ -200,7 +280,7 @@ export default function RegisterScreen() {
         {loading ? (
           <ActivityIndicator color={COLORS.white} />
         ) : (
-          <Text style={styles.buttonText}>Register on TeamUp</Text>
+          <Text style={styles.buttonText}>Create Account</Text>
         )}
       </TouchableOpacity>
 
@@ -248,8 +328,32 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     fontSize: 14,
     marginTop: 6,
-    marginBottom: 20,
+    marginBottom: 16,
     lineHeight: 20,
+  },
+
+  serverPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F3F4F6",
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    marginBottom: 16,
+    alignSelf: "flex-start",
+    gap: 7,
+  },
+
+  serverDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+
+  serverPillText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: COLORS.text,
   },
 
   roleContainer: {

@@ -9,13 +9,13 @@ import {
   Alert,
   Platform,
   StatusBar,
+  ActivityIndicator,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-
 import { router } from "expo-router";
-
 import { COLORS } from "../constants/colors";
 import { ApiService } from "../src/services/api";
+import { authStore } from "../src/services/authStore";
 
 export default function RegisterScreen() {
   const insets = useSafeAreaInsets();
@@ -28,14 +28,16 @@ export default function RegisterScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [role, setRole] = useState("Team Member");
+  const [role, setRole] = useState<"Team Member" | "Project Leader">("Team Member");
+  const [university, setUniversity] = useState("");
+  const [skills, setSkills] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleRegister = async () => {
-    if (!name || !email || !password || !confirmPassword) {
+    if (!name.trim() || !email.trim() || !password) {
       Alert.alert(
         "Missing Information",
-        "Please fill all fields."
+        "Please provide your full name, email, and password."
       );
       return;
     }
@@ -43,28 +45,43 @@ export default function RegisterScreen() {
     if (password !== confirmPassword) {
       Alert.alert(
         "Password Error",
-        "Passwords do not match."
+        "Passwords do not match. Please verify."
+      );
+      return;
+    }
+
+    if (password.length < 6) {
+      Alert.alert(
+        "Weak Password",
+        "Password should be at least 6 characters long."
       );
       return;
     }
 
     setLoading(true);
     try {
+      const skillsList = skills
+        ? skills.split(",").map((s) => s.trim()).filter(Boolean)
+        : ["React Native", "TypeScript"];
+
       const res = await ApiService.register({
         name: name.trim(),
-        email: email.trim(),
+        email: email.trim().toLowerCase(),
         password,
         role,
+        university: university.trim() || "University Student",
+        skills: skillsList,
       });
 
-      if (res && res.success) {
+      if (res && res.success && res.token && res.user) {
+        authStore.setSession(res.token, res.user);
         Alert.alert(
           "Account Created! 🎉",
-          `Welcome to TeamUp, ${res.user?.name || name}!`,
+          `Welcome to TeamUp, ${res.user.name || name}! Your data is saved into MongoDB.`,
           [
             {
-              text: "Go to Profile",
-              onPress: () => router.push("/profile"),
+              text: "Explore Projects",
+              onPress: () => router.push("/projects"),
             },
           ]
         );
@@ -84,6 +101,7 @@ export default function RegisterScreen() {
   return (
     <ScrollView
       contentContainerStyle={[styles.container, { paddingTop: topPadding + 16 }]}
+      keyboardShouldPersistTaps="handled"
     >
       <TouchableOpacity onPress={() => router.back()}>
         <Text style={styles.back}>← Back</Text>
@@ -93,24 +111,47 @@ export default function RegisterScreen() {
         Team<Text style={styles.accent}>Up</Text>
       </Text>
 
-      <Text style={styles.title}>
-        Create Account
-      </Text>
+      <Text style={styles.title}>Create Account</Text>
 
       <Text style={styles.subtitle}>
-        Join TeamUp and build better projects.
+        Join TeamUp, connect with top collaborators, and store your profile in MongoDB.
       </Text>
+
+      {/* Role Selector */}
+      <View style={styles.roleContainer}>
+        <Text style={styles.roleLabel}>I am joining as:</Text>
+        <View style={styles.roleRow}>
+          <TouchableOpacity
+            style={[styles.roleBtn, role === "Team Member" && styles.roleBtnActive]}
+            onPress={() => setRole("Team Member")}
+          >
+            <Text style={[styles.roleBtnText, role === "Team Member" && styles.roleBtnTextActive]}>
+              Team Member
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.roleBtn, role === "Project Leader" && styles.roleBtnActive]}
+            onPress={() => setRole("Project Leader")}
+          >
+            <Text style={[styles.roleBtnText, role === "Project Leader" && styles.roleBtnTextActive]}>
+              Project Leader
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
 
       <TextInput
         style={styles.input}
-        placeholder="Full name"
+        placeholder="Full name (e.g. Sadia Rimi)"
+        placeholderTextColor={COLORS.textSecondary}
         value={name}
         onChangeText={setName}
       />
 
       <TextInput
         style={styles.input}
-        placeholder="Email address"
+        placeholder="Email address (e.g. user@buet.ac.bd)"
+        placeholderTextColor={COLORS.textSecondary}
         value={email}
         onChangeText={setEmail}
         keyboardType="email-address"
@@ -119,7 +160,24 @@ export default function RegisterScreen() {
 
       <TextInput
         style={styles.input}
-        placeholder="Password"
+        placeholder="University / College (e.g. BUET, DU, NSU)"
+        placeholderTextColor={COLORS.textSecondary}
+        value={university}
+        onChangeText={setUniversity}
+      />
+
+      <TextInput
+        style={styles.input}
+        placeholder="Skills (comma-separated, e.g. Java, React, Figma)"
+        placeholderTextColor={COLORS.textSecondary}
+        value={skills}
+        onChangeText={setSkills}
+      />
+
+      <TextInput
+        style={styles.input}
+        placeholder="Password (minimum 6 characters)"
+        placeholderTextColor={COLORS.textSecondary}
         value={password}
         onChangeText={setPassword}
         secureTextEntry
@@ -128,6 +186,7 @@ export default function RegisterScreen() {
       <TextInput
         style={styles.input}
         placeholder="Confirm password"
+        placeholderTextColor={COLORS.textSecondary}
         value={confirmPassword}
         onChangeText={setConfirmPassword}
         secureTextEntry
@@ -136,18 +195,18 @@ export default function RegisterScreen() {
       <TouchableOpacity
         style={styles.button}
         onPress={handleRegister}
+        disabled={loading}
       >
-        <Text style={styles.buttonText}>
-          Create Account
-        </Text>
+        {loading ? (
+          <ActivityIndicator color={COLORS.white} />
+        ) : (
+          <Text style={styles.buttonText}>Register on TeamUp</Text>
+        )}
       </TouchableOpacity>
 
-      <TouchableOpacity
-        onPress={() => router.push("/login")}
-      >
+      <TouchableOpacity onPress={() => router.push("/login")}>
         <Text style={styles.login}>
-          Already have an account?{" "}
-          <Text style={styles.accent}>Login</Text>
+          Already have an account? <Text style={styles.accent}>Login</Text>
         </Text>
       </TouchableOpacity>
     </ScrollView>
@@ -165,7 +224,7 @@ const styles = StyleSheet.create({
   back: {
     color: COLORS.primary,
     fontWeight: "700",
-    marginBottom: 30,
+    marginBottom: 20,
   },
 
   logo: {
@@ -179,17 +238,60 @@ const styles = StyleSheet.create({
   },
 
   title: {
-    fontSize: 30,
+    fontSize: 28,
     fontWeight: "900",
     color: COLORS.text,
-    marginTop: 30,
+    marginTop: 15,
   },
 
   subtitle: {
     color: COLORS.textSecondary,
-    fontSize: 15,
-    marginTop: 8,
-    marginBottom: 25,
+    fontSize: 14,
+    marginTop: 6,
+    marginBottom: 20,
+    lineHeight: 20,
+  },
+
+  roleContainer: {
+    marginBottom: 16,
+  },
+
+  roleLabel: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: COLORS.text,
+    marginBottom: 8,
+  },
+
+  roleRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+
+  roleBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 8,
+    borderWidth: 1.5,
+    borderColor: COLORS.border,
+    alignItems: "center",
+    backgroundColor: "#F9FAFB",
+  },
+
+  roleBtnActive: {
+    borderColor: COLORS.primary,
+    backgroundColor: "#EEF2FF",
+  },
+
+  roleBtnText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: COLORS.textSecondary,
+  },
+
+  roleBtnTextActive: {
+    color: COLORS.primary,
+    fontWeight: "800",
   },
 
   input: {
@@ -197,8 +299,10 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
     borderRadius: 10,
     paddingHorizontal: 15,
-    paddingVertical: 14,
-    marginBottom: 14,
+    paddingVertical: 13,
+    marginBottom: 12,
+    color: COLORS.text,
+    backgroundColor: "#F9FAFB",
   },
 
   button: {
@@ -206,8 +310,8 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     borderRadius: 10,
     alignItems: "center",
-    marginTop: 5,
-    marginBottom: 25,
+    marginTop: 8,
+    marginBottom: 20,
   },
 
   buttonText: {
@@ -219,5 +323,6 @@ const styles = StyleSheet.create({
   login: {
     textAlign: "center",
     color: COLORS.textSecondary,
+    marginBottom: 20,
   },
 });

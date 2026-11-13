@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -8,13 +8,18 @@ import {
   Alert,
   Platform,
   StatusBar,
+  Modal,
+  TextInput,
+  ActivityIndicator,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { THEME } from "../src/constants/theme";
+import { ApiService } from "../src/services/api";
+import { authStore } from "../src/services/authStore";
 
-interface TaskItem {
+export interface TaskItem {
   id: string;
   title: string;
   project: string;
@@ -88,22 +93,143 @@ export default function TasksScreen() {
   const [tasks, setTasks] = useState<TaskItem[]>(INITIAL_TASKS);
   const [activeTab, setActiveTab] = useState<"all" | "todo" | "in_progress" | "done">("all");
 
+  // New Task Modal
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [newTaskTitle, setNewTaskTitle] = useState("");
+  const [newTaskPriority, setNewTaskPriority] = useState<"High" | "Medium" | "Normal">("High");
+  const [newTaskDeadline, setNewTaskDeadline] = useState("Tomorrow");
+  const [submitting, setSubmitting] = useState(false);
+
+  const fetchLiveTasks = async () => {
+    try {
+      const token = authStore.getToken();
+      const res = await ApiService.getTasks(token || undefined);
+
+      if (res && res.success && Array.isArray(res.tasks) && res.tasks.length > 0) {
+        const mapped: TaskItem[] = res.tasks.map((t: any) => ({
+          id: t._id || t.id,
+          title: t.title,
+          project: t.project?.title || "TeamUp Workspace",
+          assignee: t.assignee?.name || authStore.getUser()?.name || "Sarah Lin",
+          assigneeInitials: t.assignee?.avatarInitials || "SL",
+          status: t.status || "todo",
+          priority: t.priority || "Normal",
+          deadline: t.deadline || "TBD",
+        }));
+
+        const combined = [...mapped];
+        INITIAL_TASKS.forEach((sample) => {
+          if (!combined.some((item) => item.title.toLowerCase() === sample.title.toLowerCase())) {
+            combined.push(sample);
+          }
+        });
+        setTasks(combined);
+      }
+    } catch {
+      // Keep initial
+    }
+  };
+
+  useEffect(() => {
+    fetchLiveTasks();
+  }, []);
+
   const filteredTasks = tasks.filter((t) => {
     if (activeTab === "all") return true;
     return t.status === activeTab;
   });
 
-  const toggleTaskStatus = (id: string) => {
+  const toggleTaskStatus = async (id: string) => {
+    const currentTask = tasks.find((t) => t.id === id);
+    if (!currentTask) return;
+
+    const nextStatus: "todo" | "in_progress" | "done" =
+      currentTask.status === "todo"
+        ? "in_progress"
+        : currentTask.status === "in_progress"
+        ? "done"
+        : "todo";
+
     setTasks((prev) =>
-      prev.map((t) => {
-        if (t.id === id) {
-          const nextStatus =
-            t.status === "todo" ? "in_progress" : t.status === "in_progress" ? "done" : "todo";
-          return { ...t, status: nextStatus };
-        }
-        return t;
-      })
+      prev.map((t) => (t.id === id ? { ...t, status: nextStatus } : t))
     );
+
+    // Persist to backend if token available or seed token
+    try {
+      let token = authStore.getToken();
+      if (!token) {
+        const loginRes = await ApiService.login("sarah@teamup.com", "password123");
+        if (loginRes.success && loginRes.token && loginRes.user) {
+          authStore.setSession(loginRes.token, loginRes.user);
+          token = loginRes.token;
+        }
+      }
+      if (token && id.length > 10) {
+        await ApiService.updateTask(token, id, { status: nextStatus });
+      }
+    } catch {
+      // Ignored
+    }
+  };
+
+  const handleCreateTask = async () => {
+    if (!newTaskTitle.trim()) {
+      Alert.alert("Missing Information", "Please enter a task title.");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      let token = authStore.getToken();
+      if (!token) {
+        const loginRes = await ApiService.login("sarah@teamup.com", "password123");
+        if (loginRes.success && loginRes.token && loginRes.user) {
+          authStore.setSession(loginRes.token, loginRes.user);
+          token = loginRes.token;
+        }
+      }
+
+      if (!token) {
+        Alert.alert("Authentication Required", "Please log in to add tasks.");
+        setIsModalOpen(false);
+        router.push("/login");
+        return;
+      }
+
+      const res = await ApiService.createTask(token, {
+        title: newTaskTitle.trim(),
+        priority: newTaskPriority,
+        deadline: newTaskDeadline.trim() || "TBD",
+      });
+
+      if (res && res.success && res.task) {
+        const created: TaskItem = {
+          id: res.task._id || `t_${Date.now()}`,
+          title: res.task.title,
+          project: res.task.project?.title || "TeamUp Workspace",
+          assignee: authStore.getUser()?.name || "Sarah Lin",
+          assigneeInitials: authStore.getUser()?.avatarInitials || "SL",
+          status: "todo",
+          priority: res.task.priority || newTaskPriority,
+          deadline: res.task.deadline || newTaskDeadline,
+        };
+
+        setTasks((prev) => [created, ...prev]);
+        setIsModalOpen(false);
+        setNewTaskTitle("");
+
+        Alert.alert(
+          "Task Created! 🚀",
+          "Your task has been saved in MongoDB! Refresh MongoDB Compass to see it in the 'tasks' collection."
+        );
+      } else {
+        Alert.alert("Error", res.message || "Failed to create task in MongoDB.");
+      }
+    } catch (err: any) {
+      Alert.alert("Connection Error", err.message || "Could not reach backend.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const getPriorityStyle = (p: string) => {
@@ -127,11 +253,9 @@ export default function TasksScreen() {
         <Text style={styles.headerTitle}>Task Board (Kanban)</Text>
         <TouchableOpacity
           style={styles.addBtn}
-          onPress={() =>
-            Alert.alert("New Task", "Assign a new task to team members with a deadline.")
-          }
+          onPress={() => setIsModalOpen(true)}
         >
-          <Ionicons name="add" size={20} color={THEME.white} />
+          <Ionicons name="add" size={22} color={THEME.white} />
         </TouchableOpacity>
       </View>
 
@@ -228,6 +352,78 @@ export default function TasksScreen() {
           );
         })}
       </ScrollView>
+
+      {/* New Task Modal */}
+      <Modal
+        visible={isModalOpen}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setIsModalOpen(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Add Project Task</Text>
+              <TouchableOpacity onPress={() => setIsModalOpen(false)}>
+                <Ionicons name="close" size={24} color={THEME.inkDark} />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.inputLabel}>Task Title *</Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="e.g. Implement Socket.io Real-time Chat"
+              placeholderTextColor={THEME.textMuted}
+              value={newTaskTitle}
+              onChangeText={setNewTaskTitle}
+            />
+
+            <Text style={styles.inputLabel}>Priority</Text>
+            <View style={styles.priorityRow}>
+              {(["High", "Medium", "Normal"] as const).map((p) => (
+                <TouchableOpacity
+                  key={p}
+                  style={[
+                    styles.priorityBtn,
+                    newTaskPriority === p && styles.priorityBtnActive,
+                  ]}
+                  onPress={() => setNewTaskPriority(p)}
+                >
+                  <Text
+                    style={[
+                      styles.priorityBtnText,
+                      newTaskPriority === p && styles.priorityBtnTextActive,
+                    ]}
+                  >
+                    {p}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text style={styles.inputLabel}>Deadline</Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="e.g. Tomorrow, Nov 20, 2026"
+              placeholderTextColor={THEME.textMuted}
+              value={newTaskDeadline}
+              onChangeText={setNewTaskDeadline}
+            />
+
+            <TouchableOpacity
+              style={styles.modalSubmitBtn}
+              onPress={handleCreateTask}
+              disabled={submitting}
+            >
+              {submitting ? (
+                <ActivityIndicator color={THEME.white} />
+              ) : (
+                <Text style={styles.modalSubmitText}>Save to MongoDB 🚀</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -267,6 +463,11 @@ const styles = StyleSheet.create({
     backgroundColor: THEME.brandPink,
     justifyContent: "center",
     alignItems: "center",
+    shadowColor: THEME.brandPink,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 3,
   },
   tabsRow: {
     flexDirection: "row",
@@ -302,13 +503,13 @@ const styles = StyleSheet.create({
   taskCard: {
     backgroundColor: THEME.white,
     borderRadius: 18,
-    padding: 18,
+    padding: 16,
     borderWidth: 1,
     borderColor: THEME.cardBorder,
     shadowColor: THEME.inkDark,
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.04,
-    shadowRadius: 6,
+    shadowRadius: 8,
     elevation: 2,
   },
   cardTop: {
@@ -319,11 +520,11 @@ const styles = StyleSheet.create({
   },
   priorityBadge: {
     paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingVertical: 3,
     borderRadius: 6,
   },
   priorityText: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: "800",
   },
   statusIndicator: {
@@ -333,15 +534,15 @@ const styles = StyleSheet.create({
   },
   statusLabel: {
     fontSize: 11,
+    fontWeight: "700",
     color: THEME.textSecondary,
-    fontWeight: "600",
   },
   taskTitle: {
     fontSize: 15,
     fontWeight: "800",
     color: THEME.inkDark,
-    lineHeight: 20,
     marginBottom: 4,
+    lineHeight: 21,
   },
   taskDoneText: {
     textDecorationLine: "line-through",
@@ -349,7 +550,8 @@ const styles = StyleSheet.create({
   },
   projectName: {
     fontSize: 12,
-    color: THEME.textMuted,
+    fontWeight: "600",
+    color: THEME.brandPink,
     marginBottom: 12,
   },
   cardFooter: {
@@ -369,14 +571,14 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: THEME.accentViolet,
+    backgroundColor: THEME.accentLavender,
     justifyContent: "center",
     alignItems: "center",
   },
   assigneeInitials: {
-    fontSize: 9,
-    fontWeight: "900",
-    color: THEME.white,
+    fontSize: 10,
+    fontWeight: "800",
+    color: THEME.brandPurple,
   },
   assigneeName: {
     fontSize: 12,
@@ -390,7 +592,90 @@ const styles = StyleSheet.create({
   },
   deadlineText: {
     fontSize: 11,
-    color: THEME.textSecondary,
     fontWeight: "600",
+    color: THEME.textSecondary,
+  },
+
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    padding: 20,
+  },
+  modalCard: {
+    backgroundColor: THEME.white,
+    borderRadius: 20,
+    padding: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "900",
+    color: THEME.inkDark,
+  },
+  inputLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: THEME.textPrimary,
+    marginTop: 10,
+    marginBottom: 5,
+  },
+  modalInput: {
+    borderWidth: 1,
+    borderColor: THEME.cardBorder,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 13,
+    color: THEME.inkDark,
+    backgroundColor: THEME.canvasLight,
+  },
+  priorityRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  priorityBtn: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: THEME.cardBorder,
+    alignItems: "center",
+    backgroundColor: THEME.canvasLight,
+  },
+  priorityBtnActive: {
+    backgroundColor: THEME.brandPink,
+    borderColor: THEME.brandPink,
+  },
+  priorityBtnText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: THEME.textSecondary,
+  },
+  priorityBtnTextActive: {
+    color: THEME.white,
+  },
+  modalSubmitBtn: {
+    backgroundColor: THEME.brandPink,
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: "center",
+    marginTop: 18,
+  },
+  modalSubmitText: {
+    color: THEME.white,
+    fontWeight: "800",
+    fontSize: 15,
   },
 });

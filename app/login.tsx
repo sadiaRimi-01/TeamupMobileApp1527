@@ -8,13 +8,14 @@ import {
   Alert,
   Platform,
   StatusBar,
+  ScrollView,
+  ActivityIndicator,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-
 import { router } from "expo-router";
-
 import { COLORS } from "../constants/colors";
 import { ApiService } from "../src/services/api";
+import { authStore } from "../src/services/authStore";
 
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
@@ -40,22 +41,22 @@ export default function LoginScreen() {
     try {
       const res = await ApiService.login(email.trim(), password);
 
-      if (res && res.success) {
+      if (res && res.success && res.token && res.user) {
+        authStore.setSession(res.token, res.user);
         Alert.alert(
           "Login Successful! 🎉",
-          `Welcome back, ${res.user?.name || "Member"}!`,
+          `Welcome back, ${res.user?.name || "Member"}! (${res.user?.role})`,
           [
             {
-              text: "Continue",
-              onPress: () => router.push("/profile"),
+              text: "Explore Projects",
+              onPress: () => router.push("/projects"),
             },
           ]
         );
       } else {
-        // If backend server isn't reachable or invalid credentials
         Alert.alert(
           "Notice",
-          res.message || "Could not connect to backend server. Make sure MongoDB and backend are running."
+          res.message || "Invalid credentials or backend server is not responding."
         );
       }
     } catch (err: any) {
@@ -65,8 +66,16 @@ export default function LoginScreen() {
     }
   };
 
+  const fillQuickTest = (testEmail: string, testPass: string) => {
+    setEmail(testEmail);
+    setPassword(testPass);
+  };
+
   return (
-    <View style={[styles.container, { paddingTop: topPadding + 20 }]}>
+    <ScrollView
+      contentContainerStyle={[styles.container, { paddingTop: topPadding + 20 }]}
+      keyboardShouldPersistTaps="handled"
+    >
       <TouchableOpacity onPress={() => router.back()}>
         <Text style={styles.back}>← Back</Text>
       </TouchableOpacity>
@@ -78,12 +87,13 @@ export default function LoginScreen() {
       <Text style={styles.title}>Welcome Back</Text>
 
       <Text style={styles.subtitle}>
-        Login to continue collaborating.
+        Login to continue collaborating & managing tasks.
       </Text>
 
       <TextInput
         style={styles.input}
         placeholder="Email address"
+        placeholderTextColor={COLORS.textSecondary}
         value={email}
         onChangeText={setEmail}
         keyboardType="email-address"
@@ -93,6 +103,7 @@ export default function LoginScreen() {
       <TextInput
         style={styles.input}
         placeholder="Password"
+        placeholderTextColor={COLORS.textSecondary}
         value={password}
         onChangeText={setPassword}
         secureTextEntry
@@ -101,25 +112,46 @@ export default function LoginScreen() {
       <TouchableOpacity
         style={styles.button}
         onPress={handleLogin}
+        disabled={loading}
       >
-        <Text style={styles.buttonText}>Login</Text>
+        {loading ? (
+          <ActivityIndicator color={COLORS.white} />
+        ) : (
+          <Text style={styles.buttonText}>Login</Text>
+        )}
       </TouchableOpacity>
 
-      <TouchableOpacity
-        onPress={() => router.push("/register")}
-      >
+      {/* Quick Test Demo Credentials */}
+      <View style={styles.quickBox}>
+        <Text style={styles.quickTitle}>Quick Seed Accounts (1-Tap Fill):</Text>
+        <View style={styles.quickRow}>
+          <TouchableOpacity
+            style={styles.quickPill}
+            onPress={() => fillQuickTest("sarah@teamup.com", "password123")}
+          >
+            <Text style={styles.quickPillText}>Sarah Lin (Leader)</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.quickPill}
+            onPress={() => fillQuickTest("david@teamup.com", "password123")}
+          >
+            <Text style={styles.quickPillText}>David Chen (Member)</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      <TouchableOpacity onPress={() => router.push("/register")}>
         <Text style={styles.register}>
-          Don't have an account?{" "}
-          <Text style={styles.accent}>Register</Text>
+          Don't have an account? <Text style={styles.accent}>Register</Text>
         </Text>
       </TouchableOpacity>
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
+    flexGrow: 1,
     backgroundColor: COLORS.white,
     padding: 24,
     justifyContent: "center",
@@ -128,7 +160,7 @@ const styles = StyleSheet.create({
   back: {
     color: COLORS.primary,
     fontWeight: "700",
-    marginBottom: 35,
+    marginBottom: 25,
   },
 
   logo: {
@@ -142,10 +174,10 @@ const styles = StyleSheet.create({
   },
 
   title: {
-    fontSize: 30,
+    fontSize: 28,
     fontWeight: "900",
     color: COLORS.text,
-    marginTop: 35,
+    marginTop: 20,
   },
 
   subtitle: {
@@ -163,6 +195,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     marginBottom: 14,
     color: COLORS.text,
+    backgroundColor: "#F9FAFB",
   },
 
   button: {
@@ -171,7 +204,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: "center",
     marginTop: 5,
-    marginBottom: 25,
+    marginBottom: 20,
   },
 
   buttonText: {
@@ -180,8 +213,43 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
 
+  quickBox: {
+    backgroundColor: "#F3F4F6",
+    padding: 12,
+    borderRadius: 10,
+    marginBottom: 24,
+  },
+
+  quickTitle: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: COLORS.textSecondary,
+    marginBottom: 8,
+  },
+
+  quickRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+
+  quickPill: {
+    backgroundColor: COLORS.white,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  quickPillText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: COLORS.primary,
+  },
+
   register: {
     textAlign: "center",
     color: COLORS.textSecondary,
+    marginBottom: 20,
   },
 });

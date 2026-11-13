@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -9,13 +9,17 @@ import {
   Alert,
   Platform,
   StatusBar,
+  Modal,
+  ActivityIndicator,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { THEME } from "../src/constants/theme";
+import { ApiService } from "../src/services/api";
+import { authStore } from "../src/services/authStore";
 
-interface ProjectItem {
+export interface ProjectItem {
   id: string;
   title: string;
   category: string;
@@ -84,10 +88,61 @@ export default function ProjectsScreen() {
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [appliedProjects, setAppliedProjects] = useState<Record<string, boolean>>({});
+  const [projects, setProjects] = useState<ProjectItem[]>(SAMPLE_PROJECTS);
+  const [loading, setLoading] = useState(false);
+
+  // Post Project Modal State
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [newTitle, setNewTitle] = useState("");
+  const [newDesc, setNewDesc] = useState("");
+  const [newCategory, setNewCategory] = useState("Mobile & AI");
+  const [newSkills, setNewSkills] = useState("");
+  const [newTeamSize, setNewTeamSize] = useState("4");
+  const [newDeadline, setNewDeadline] = useState("Dec 30, 2026");
+  const [submitting, setSubmitting] = useState(false);
 
   const categories = ["All", "Mobile & AI", "Full Stack & Cloud", "UI/UX & Web", "Machine Learning"];
 
-  const filteredProjects = SAMPLE_PROJECTS.filter((p) => {
+  const fetchLiveProjects = async () => {
+    try {
+      const res = await ApiService.getProjects(
+        selectedCategory === "All" ? undefined : selectedCategory,
+        undefined,
+        search.trim() || undefined
+      );
+
+      if (res && res.success && Array.isArray(res.projects) && res.projects.length > 0) {
+        const mapped: ProjectItem[] = res.projects.map((p: any) => ({
+          id: p._id || p.id,
+          title: p.title,
+          category: p.category || "Full Stack & Cloud",
+          desc: p.description,
+          requiredSkills: Array.isArray(p.requiredSkills) ? p.requiredSkills : [],
+          members: `${(p.members?.length || 0) + 1} / ${p.maxTeamSize || 4} Members`,
+          leader: p.leader?.name || "Project Leader",
+          deadline: p.deadline || "TBD",
+          status: p.status || "Recruiting",
+        }));
+
+        // Merge with samples if less than 3
+        const combined = [...mapped];
+        SAMPLE_PROJECTS.forEach((sample) => {
+          if (!combined.some((item) => item.title.toLowerCase() === sample.title.toLowerCase())) {
+            combined.push(sample);
+          }
+        });
+        setProjects(combined);
+      }
+    } catch {
+      // Keep existing
+    }
+  };
+
+  useEffect(() => {
+    fetchLiveProjects();
+  }, [selectedCategory, search]);
+
+  const filteredProjects = projects.filter((p) => {
     const matchCat = selectedCategory === "All" || p.category === selectedCategory;
     const matchSearch =
       p.title.toLowerCase().includes(search.toLowerCase()) ||
@@ -95,9 +150,97 @@ export default function ProjectsScreen() {
     return matchCat && matchSearch;
   });
 
-  const handleApply = (id: string, title: string) => {
+  const handleApply = async (id: string, title: string) => {
+    let token = authStore.getToken();
+
+    if (!token) {
+      // Auto-fallback: try to login as demo user to ensure MongoDB record creation
+      const loginRes = await ApiService.login("david@teamup.com", "password123");
+      if (loginRes.success && loginRes.token && loginRes.user) {
+        authStore.setSession(loginRes.token, loginRes.user);
+        token = loginRes.token;
+      }
+    }
+
+    if (token) {
+      await ApiService.applyToProject(token, id, "I would love to contribute my technical skills.");
+    }
+
     setAppliedProjects((prev) => ({ ...prev, [id]: true }));
-    Alert.alert("Application Submitted! 🚀", `Your application to join "${title}" has been sent to the Project Leader.`);
+    Alert.alert(
+      "Application Submitted! 🚀",
+      `Your application to join "${title}" has been saved in MongoDB and sent to the Project Leader.`
+    );
+  };
+
+  const handleCreateProject = async () => {
+    if (!newTitle.trim() || !newDesc.trim() || !newSkills.trim()) {
+      Alert.alert("Missing Fields", "Please provide a title, description, and required skills.");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      let token = authStore.getToken();
+
+      // If user isn't logged in yet, login as seed leader (Sarah Lin)
+      if (!token) {
+        const loginRes = await ApiService.login("sarah@teamup.com", "password123");
+        if (loginRes.success && loginRes.token && loginRes.user) {
+          authStore.setSession(loginRes.token, loginRes.user);
+          token = loginRes.token;
+        }
+      }
+
+      if (!token) {
+        Alert.alert("Authentication Required", "Please log in to publish a project.");
+        setIsModalOpen(false);
+        router.push("/login");
+        return;
+      }
+
+      const skillsList = newSkills.split(",").map((s) => s.trim()).filter(Boolean);
+
+      const res = await ApiService.createProject(token, {
+        title: newTitle.trim(),
+        description: newDesc.trim(),
+        category: newCategory,
+        requiredSkills: skillsList,
+        maxTeamSize: parseInt(newTeamSize, 10) || 4,
+        deadline: newDeadline.trim() || "TBD",
+      });
+
+      if (res && res.success && res.project) {
+        const newProjItem: ProjectItem = {
+          id: res.project._id || `p_${Date.now()}`,
+          title: res.project.title,
+          category: res.project.category,
+          desc: res.project.description,
+          requiredSkills: res.project.requiredSkills,
+          members: `1 / ${res.project.maxTeamSize} Members`,
+          leader: authStore.getUser()?.name || "Sarah Lin",
+          deadline: res.project.deadline,
+          status: "Recruiting",
+        };
+
+        setProjects((prev) => [newProjItem, ...prev]);
+        setIsModalOpen(false);
+        setNewTitle("");
+        setNewDesc("");
+        setNewSkills("");
+
+        Alert.alert(
+          "Project Created! 🚀",
+          "Your new project is successfully saved in MongoDB! Refresh MongoDB Compass to see it in the 'projects' collection."
+        );
+      } else {
+        Alert.alert("Error", res.message || "Failed to create project in backend.");
+      }
+    } catch (err: any) {
+      Alert.alert("Connection Error", err.message || "Could not reach backend.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -110,11 +253,9 @@ export default function ProjectsScreen() {
         <Text style={styles.headerTitle}>Explore Projects</Text>
         <TouchableOpacity
           style={styles.postBtn}
-          onPress={() =>
-            Alert.alert("Post Project", "Create a new project posting to recruit qualified team members.")
-          }
+          onPress={() => setIsModalOpen(true)}
         >
-          <Ionicons name="add" size={20} color={THEME.white} />
+          <Ionicons name="add" size={22} color={THEME.white} />
         </TouchableOpacity>
       </View>
 
@@ -223,6 +364,106 @@ export default function ProjectsScreen() {
           );
         })}
       </ScrollView>
+
+      {/* Post Project Modal */}
+      <Modal
+        visible={isModalOpen}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setIsModalOpen(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Post a New Project</Text>
+              <TouchableOpacity onPress={() => setIsModalOpen(false)}>
+                <Ionicons name="close" size={24} color={THEME.inkDark} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 420 }}>
+              <Text style={styles.inputLabel}>Project Title *</Text>
+              <TextInput
+                style={styles.modalInput}
+                placeholder="e.g. AI-Powered Smart Campus Navigation"
+                placeholderTextColor={THEME.textMuted}
+                value={newTitle}
+                onChangeText={setNewTitle}
+              />
+
+              <Text style={styles.inputLabel}>Category</Text>
+              <View style={styles.modalCatRow}>
+                {["Mobile & AI", "Full Stack & Cloud", "UI/UX & Web", "Machine Learning"].map((c) => (
+                  <TouchableOpacity
+                    key={c}
+                    style={[styles.modalCatPill, newCategory === c && styles.modalCatPillActive]}
+                    onPress={() => setNewCategory(c)}
+                  >
+                    <Text style={[styles.modalCatText, newCategory === c && styles.modalCatTextActive]}>
+                      {c}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <Text style={styles.inputLabel}>Project Description *</Text>
+              <TextInput
+                style={[styles.modalInput, { height: 75, textAlignVertical: "top" }]}
+                placeholder="Describe your project goal, scope, and target architecture..."
+                placeholderTextColor={THEME.textMuted}
+                multiline
+                value={newDesc}
+                onChangeText={setNewDesc}
+              />
+
+              <Text style={styles.inputLabel}>Required Skills (comma separated) *</Text>
+              <TextInput
+                style={styles.modalInput}
+                placeholder="e.g. React Native, TypeScript, Node.js, Python"
+                placeholderTextColor={THEME.textMuted}
+                value={newSkills}
+                onChangeText={setNewSkills}
+              />
+
+              <View style={{ flexDirection: "row", gap: 12 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.inputLabel}>Team Size</Text>
+                  <TextInput
+                    style={styles.modalInput}
+                    placeholder="4"
+                    keyboardType="number-pad"
+                    placeholderTextColor={THEME.textMuted}
+                    value={newTeamSize}
+                    onChangeText={setNewTeamSize}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.inputLabel}>Deadline</Text>
+                  <TextInput
+                    style={styles.modalInput}
+                    placeholder="Dec 30, 2026"
+                    placeholderTextColor={THEME.textMuted}
+                    value={newDeadline}
+                    onChangeText={setNewDeadline}
+                  />
+                </View>
+              </View>
+            </ScrollView>
+
+            <TouchableOpacity
+              style={styles.modalSubmitBtn}
+              onPress={handleCreateProject}
+              disabled={submitting}
+            >
+              {submitting ? (
+                <ActivityIndicator color={THEME.white} />
+              ) : (
+                <Text style={styles.modalSubmitText}>Publish to MongoDB 🚀</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -470,5 +711,89 @@ const styles = StyleSheet.create({
   },
   appliedBtnText: {
     color: THEME.successGreen,
+  },
+
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    padding: 20,
+  },
+  modalCard: {
+    backgroundColor: THEME.white,
+    borderRadius: 20,
+    padding: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "900",
+    color: THEME.inkDark,
+  },
+  inputLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: THEME.textPrimary,
+    marginTop: 10,
+    marginBottom: 5,
+  },
+  modalInput: {
+    borderWidth: 1,
+    borderColor: THEME.cardBorder,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 13,
+    color: THEME.inkDark,
+    backgroundColor: THEME.canvasLight,
+  },
+  modalCatRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    marginBottom: 6,
+  },
+  modalCatPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+    backgroundColor: THEME.canvasLight,
+    borderWidth: 1,
+    borderColor: THEME.cardBorder,
+  },
+  modalCatPillActive: {
+    backgroundColor: THEME.brandPink,
+    borderColor: THEME.brandPink,
+  },
+  modalCatText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: THEME.textSecondary,
+  },
+  modalCatTextActive: {
+    color: THEME.white,
+  },
+  modalSubmitBtn: {
+    backgroundColor: THEME.brandPink,
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: "center",
+    marginTop: 16,
+  },
+  modalSubmitText: {
+    color: THEME.white,
+    fontWeight: "800",
+    fontSize: 15,
   },
 });

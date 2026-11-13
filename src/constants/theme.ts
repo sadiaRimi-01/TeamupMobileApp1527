@@ -22,6 +22,8 @@ export const THEME = {
   pastelSky: "#F0F9FF",      // Clean Sky Tint
 
   // Accent saturated colors
+  accentLavender: "#A78BFA", // Soft Lavender
+  brandPurple: "#312E81",    // Royal Blue Deep
   accentViolet: "#4F46E5",   // Royal Indigo
   accentCyan: "#06B6D4",     // Cyan
   highlightWarm: "#F59E0B",  // Warm Amber

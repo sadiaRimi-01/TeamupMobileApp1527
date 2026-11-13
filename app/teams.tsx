@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -16,6 +16,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import { THEME } from "../src/constants/theme";
 import { HERO_MEMBERS, POPULAR_SKILLS } from "../src/constants/mockData";
 import { TeamMember } from "../src/types";
+import { ApiService } from "../src/services/api";
 
 export default function TeamsScreen() {
   const insets = useSafeAreaInsets();
@@ -28,10 +29,46 @@ export default function TeamsScreen() {
   const [search, setSearch] = useState(params.skill || "");
   const [selectedFilter, setSelectedFilter] = useState(params.skill || "All");
   const [invitedMap, setInvitedMap] = useState<Record<string, boolean>>({});
+  const [members, setMembers] = useState<TeamMember[]>(HERO_MEMBERS);
 
   const filterOptions = ["All", ...POPULAR_SKILLS];
 
-  const filteredMembers = HERO_MEMBERS.filter((m) => {
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const res = await ApiService.getAllUsers(search.trim() || undefined);
+        if (res && res.success && Array.isArray(res.users) && res.users.length > 0) {
+          const liveMembers: TeamMember[] = res.users.map((u: any, idx: number) => ({
+            id: u._id || `u_${idx}`,
+            name: u.name,
+            role: u.role || "Team Member",
+            skills: Array.isArray(u.skills) && u.skills.length > 0 ? u.skills : ["React Native", "TypeScript"],
+            university: u.university || "University Student",
+            matchPct: 92 + (idx % 7),
+            rating: u.rating || 5.0,
+            reviewCount: u.reviewCount || 12,
+            initials: u.avatarInitials || (u.name ? u.name.substring(0, 2).toUpperCase() : "TU"),
+            bio: u.bio || "Passionate about team collaboration and building modern applications.",
+            gradient: [THEME.brandPurple, THEME.brandPink],
+          }));
+
+          const combined = [...liveMembers];
+          HERO_MEMBERS.forEach((m) => {
+            if (!combined.some((item) => item.name.toLowerCase() === m.name.toLowerCase())) {
+              combined.push(m);
+            }
+          });
+          setMembers(combined);
+        }
+      } catch {
+        // Fallback to static mock
+      }
+    };
+
+    fetchUsers();
+  }, [search]);
+
+  const filteredMembers = members.filter((m) => {
     const matchesFilter =
       selectedFilter === "All" ||
       m.skills.some((s) => s.toLowerCase() === selectedFilter.toLowerCase());

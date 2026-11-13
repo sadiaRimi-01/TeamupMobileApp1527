@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { THEME } from "../src/constants/theme";
+import { authStore, AuthUser } from "../src/services/authStore";
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
@@ -21,7 +22,23 @@ export default function ProfileScreen() {
     Platform.OS === "android" ? (StatusBar.currentHeight || 28) : 0
   );
 
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(authStore.getUser());
   const [activeTab, setActiveTab] = useState<"skills" | "projects" | "reviews">("skills");
+
+  useEffect(() => {
+    setCurrentUser(authStore.getUser());
+    const unsub = authStore.subscribe(() => {
+      setCurrentUser(authStore.getUser());
+    });
+    return unsub;
+  }, []);
+
+  const handleSignOut = () => {
+    authStore.clearSession();
+    Alert.alert("Signed Out", "You have signed out of your session.", [
+      { text: "OK", onPress: () => router.push("/login") },
+    ]);
+  };
 
   const reviews = [
     {
@@ -67,20 +84,30 @@ export default function ProfileScreen() {
         <View style={styles.profileCard}>
           <View style={styles.profileHeader}>
             <View style={styles.avatar}>
-              <Text style={styles.avatarText}>ME</Text>
+              <Text style={styles.avatarText}>
+                {currentUser?.avatarInitials || "ME"}
+              </Text>
             </View>
 
             <View style={{ flex: 1 }}>
               <View style={styles.nameRow}>
-                <Text style={styles.name}>Rafi Al-Mamun</Text>
+                <Text style={styles.name}>{currentUser?.name || "Rafi Al-Mamun"}</Text>
                 <View style={styles.badge}>
                   <Ionicons name="shield-checkmark" size={12} color={THEME.brandPink} />
-                  <Text style={styles.badgeText}>Pro Builder</Text>
+                  <Text style={styles.badgeText}>
+                    {currentUser ? currentUser.role : "Pro Builder"}
+                  </Text>
                 </View>
               </View>
 
-              <Text style={styles.role}>Full-Stack Developer & UI Enthusiast</Text>
-              <Text style={styles.university}>CS Undergraduate · BUET</Text>
+              <Text style={styles.role}>
+                {currentUser
+                  ? `${currentUser.email}`
+                  : "Full-Stack Developer & UI Enthusiast"}
+              </Text>
+              <Text style={styles.university}>
+                {currentUser?.university || "CS Undergraduate · BUET"}
+              </Text>
             </View>
           </View>
 
@@ -89,7 +116,9 @@ export default function ProfileScreen() {
             <View style={styles.ratingCol}>
               <View style={styles.starRow}>
                 <Ionicons name="star" size={16} color="#F59E0B" />
-                <Text style={styles.ratingNumber}>4.9</Text>
+                <Text style={styles.ratingNumber}>
+                  {currentUser?.rating || 4.9}
+                </Text>
               </View>
               <Text style={styles.ratingSub}>Overall Rating</Text>
             </View>
@@ -97,7 +126,9 @@ export default function ProfileScreen() {
             <View style={styles.vDivider} />
 
             <View style={styles.ratingCol}>
-              <Text style={styles.statBig}>14</Text>
+              <Text style={styles.statBig}>
+                {currentUser?.reviewCount || 14}
+              </Text>
               <Text style={styles.ratingSub}>Completed Projects</Text>
             </View>
 
@@ -109,17 +140,45 @@ export default function ProfileScreen() {
             </View>
           </View>
 
-          {/* Social links */}
-          <View style={styles.socialRow}>
-            <TouchableOpacity style={styles.socialBtn}>
-              <Ionicons name="logo-github" size={16} color={THEME.inkDark} />
-              <Text style={styles.socialBtnText}>github.com/rafi</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.socialBtn}>
-              <Ionicons name="link-outline" size={16} color={THEME.inkDark} />
-              <Text style={styles.socialBtnText}>Portfolio</Text>
-            </TouchableOpacity>
+          {/* Auth Action Strip */}
+          <View style={{ marginTop: 14, paddingTop: 12, borderTopWidth: 1, borderTopColor: THEME.cardBorderSubtle }}>
+            {currentUser ? (
+              <TouchableOpacity
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  backgroundColor: "#FEE2E2",
+                  paddingVertical: 9,
+                  borderRadius: 10,
+                  gap: 6,
+                }}
+                onPress={handleSignOut}
+              >
+                <Ionicons name="log-out-outline" size={16} color="#EF4444" />
+                <Text style={{ color: "#EF4444", fontWeight: "800", fontSize: 13 }}>
+                  Sign Out ({currentUser.name})
+                </Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  backgroundColor: THEME.brandPink,
+                  paddingVertical: 9,
+                  borderRadius: 10,
+                  gap: 6,
+                }}
+                onPress={() => router.push("/login")}
+              >
+                <Ionicons name="log-in-outline" size={16} color={THEME.white} />
+                <Text style={{ color: THEME.white, fontWeight: "800", fontSize: 13 }}>
+                  Sign In / Register
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
 

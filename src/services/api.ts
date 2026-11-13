@@ -1,55 +1,10 @@
-import Constants from "expo-constants";
-import { Platform } from "react-native";
-
 /**
  * TeamUp Backend API Configuration & Service Helpers
  * Connects React Native Frontend to Node.js & Express / MongoDB Backend.
  */
 
-// Dynamically retrieve the host IP assigned by Expo Metro, or fall back to LAN IP
-export const getApiBaseUrl = (): string => {
-  try {
-    const hostUri = Constants.expoConfig?.hostUri;
-    if (hostUri) {
-      const ip = hostUri.split(":")[0];
-      if (ip && ip !== "localhost" && ip !== "127.0.0.1") {
-        return `http://${ip}:5000/api`;
-      }
-    }
-  } catch {
-    // ignore
-  }
-
-  // Fallback to active Wi-Fi LAN IP
-  return "http://192.168.0.196:5000/api";
-};
-
-export let API_BASE_URL = getApiBaseUrl();
-
-export const setApiBaseUrl = (newUrl: string) => {
-  API_BASE_URL = newUrl;
-};
-
-// Safe fetch with 6-second timeout to avoid long java.net.NoRouteToHostException hangs
-const fetchWithTimeout = async (url: string, options: RequestInit = {}, timeoutMs: number = 6000) => {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-
-  try {
-    const res = await fetch(url, {
-      ...options,
-      signal: controller.signal,
-    });
-    clearTimeout(timer);
-    return res;
-  } catch (err: any) {
-    clearTimeout(timer);
-    if (err.name === "AbortError") {
-      throw new Error(`Connection timed out after ${timeoutMs / 1000}s. Backend server at ${API_BASE_URL} is not responding.`);
-    }
-    throw err;
-  }
-};
+// User LAN IP for testing on physical phone via Expo Go
+export const API_BASE_URL = "http://192.168.0.196:5000/api";
 
 export interface ApiResponse<T = any> {
   success: boolean;
@@ -70,22 +25,10 @@ export interface ApiResponse<T = any> {
 }
 
 export const ApiService = {
-  // Check if Backend Server & MongoDB are reachable
-  checkHealth: async (): Promise<{ online: boolean; message: string }> => {
-    try {
-      const rootUrl = API_BASE_URL.replace("/api", "");
-      const res = await fetchWithTimeout(`${rootUrl}/`, { method: "GET" }, 3000);
-      const data = await res.json();
-      return { online: true, message: data.message || "Backend online" };
-    } catch (err: any) {
-      return { online: false, message: err.message || "Backend offline" };
-    }
-  },
-
   // Authentication
   login: async (email: string, password: string): Promise<ApiResponse> => {
     try {
-      const res = await fetchWithTimeout(`${API_BASE_URL}/auth/login`, {
+      const res = await fetch(`${API_BASE_URL}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
@@ -93,16 +36,13 @@ export const ApiService = {
       return await res.json();
     } catch (err: any) {
       console.warn("API Login Error:", err.message);
-      return {
-        success: false,
-        message: err.message || "Network request failed. Make sure backend is running on your PC.",
-      };
+      return { success: false, message: err.message || "Network request failed" };
     }
   },
 
   register: async (userData: any): Promise<ApiResponse> => {
     try {
-      const res = await fetchWithTimeout(`${API_BASE_URL}/auth/register`, {
+      const res = await fetch(`${API_BASE_URL}/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(userData),
@@ -110,16 +50,13 @@ export const ApiService = {
       return await res.json();
     } catch (err: any) {
       console.warn("API Register Error:", err.message);
-      return {
-        success: false,
-        message: err.message || "Network request failed. Make sure backend is running on your PC.",
-      };
+      return { success: false, message: err.message || "Network request failed" };
     }
   },
 
   getMe: async (token: string): Promise<ApiResponse> => {
     try {
-      const res = await fetchWithTimeout(`${API_BASE_URL}/auth/me`, {
+      const res = await fetch(`${API_BASE_URL}/auth/me`, {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
@@ -135,7 +72,7 @@ export const ApiService = {
     try {
       let query = "";
       if (search) query = `?search=${encodeURIComponent(search)}`;
-      const res = await fetchWithTimeout(`${API_BASE_URL}/auth/users${query}`);
+      const res = await fetch(`${API_BASE_URL}/auth/users${query}`);
       return await res.json();
     } catch (err: any) {
       return { success: false, message: err.message };
@@ -151,7 +88,7 @@ export const ApiService = {
       if (search) params.push(`search=${encodeURIComponent(search)}`);
       const qs = params.length > 0 ? `?${params.join("&")}` : "";
 
-      const res = await fetchWithTimeout(`${API_BASE_URL}/projects${qs}`);
+      const res = await fetch(`${API_BASE_URL}/projects${qs}`);
       return await res.json();
     } catch (err: any) {
       console.warn("API getProjects Error:", err.message);
@@ -159,20 +96,17 @@ export const ApiService = {
     }
   },
 
-  createProject: async (
-    token: string,
-    projectData: {
-      title: string;
-      description: string;
-      category?: string;
-      difficulty?: string;
-      requiredSkills: string[] | string;
-      maxTeamSize?: number;
-      deadline?: string;
-    }
-  ): Promise<ApiResponse> => {
+  createProject: async (token: string, projectData: {
+    title: string;
+    description: string;
+    category?: string;
+    difficulty?: string;
+    requiredSkills: string[] | string;
+    maxTeamSize?: number;
+    deadline?: string;
+  }): Promise<ApiResponse> => {
     try {
-      const res = await fetchWithTimeout(`${API_BASE_URL}/projects`, {
+      const res = await fetch(`${API_BASE_URL}/projects`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -189,7 +123,7 @@ export const ApiService = {
 
   getProjectById: async (id: string): Promise<ApiResponse> => {
     try {
-      const res = await fetchWithTimeout(`${API_BASE_URL}/projects/${id}`);
+      const res = await fetch(`${API_BASE_URL}/projects/${id}`);
       return await res.json();
     } catch (err: any) {
       return { success: false, message: err.message };
@@ -199,7 +133,7 @@ export const ApiService = {
   // Project Applications
   applyToProject: async (token: string, projectId: string, coverNote?: string): Promise<ApiResponse> => {
     try {
-      const res = await fetchWithTimeout(`${API_BASE_URL}/applications/${projectId}`, {
+      const res = await fetch(`${API_BASE_URL}/applications/${projectId}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -220,7 +154,7 @@ export const ApiService = {
       const headers: Record<string, string> = { "Content-Type": "application/json" };
       if (token) headers.Authorization = `Bearer ${token}`;
 
-      const res = await fetchWithTimeout(endpoint, { headers });
+      const res = await fetch(endpoint, { headers });
       return await res.json();
     } catch (err: any) {
       console.warn("API getTasks Error:", err.message);
@@ -228,18 +162,15 @@ export const ApiService = {
     }
   },
 
-  createTask: async (
-    token: string,
-    taskData: {
-      title: string;
-      description?: string;
-      priority?: string;
-      deadline?: string;
-      projectId?: string;
-    }
-  ): Promise<ApiResponse> => {
+  createTask: async (token: string, taskData: {
+    title: string;
+    description?: string;
+    priority?: string;
+    deadline?: string;
+    projectId?: string;
+  }): Promise<ApiResponse> => {
     try {
-      const res = await fetchWithTimeout(`${API_BASE_URL}/tasks`, {
+      const res = await fetch(`${API_BASE_URL}/tasks`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -255,7 +186,7 @@ export const ApiService = {
 
   updateTask: async (token: string, taskId: string, updateData: any): Promise<ApiResponse> => {
     try {
-      const res = await fetchWithTimeout(`${API_BASE_URL}/tasks/item/${taskId}`, {
+      const res = await fetch(`${API_BASE_URL}/tasks/item/${taskId}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -272,7 +203,7 @@ export const ApiService = {
   // Teammates & Matching
   matchTeammates: async (skills: string[]): Promise<ApiResponse> => {
     try {
-      const res = await fetchWithTimeout(`${API_BASE_URL}/matchmaker`, {
+      const res = await fetch(`${API_BASE_URL}/matchmaker`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ skills }),
@@ -286,7 +217,7 @@ export const ApiService = {
   // Reviews
   createReview: async (token: string, reviewData: any): Promise<ApiResponse> => {
     try {
-      const res = await fetchWithTimeout(`${API_BASE_URL}/reviews`, {
+      const res = await fetch(`${API_BASE_URL}/reviews`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -302,7 +233,7 @@ export const ApiService = {
 
   getUserReviews: async (userId: string): Promise<ApiResponse> => {
     try {
-      const res = await fetchWithTimeout(`${API_BASE_URL}/reviews/user/${userId}`);
+      const res = await fetch(`${API_BASE_URL}/reviews/user/${userId}`);
       return await res.json();
     } catch (err: any) {
       return { success: false, message: err.message };

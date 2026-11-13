@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
 
 import { COLORS } from "../constants/colors";
+import { ApiService } from "../src/services/api";
 
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
@@ -23,23 +24,45 @@ export default function LoginScreen() {
   );
 
   const [email, setEmail] = useState("");
-
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     if (!email || !password) {
       Alert.alert(
         "Missing Information",
         "Please enter your email and password."
       );
-
       return;
     }
 
-    Alert.alert(
-      "Frontend Demo",
-      "Backend authentication will be connected later."
-    );
+    setLoading(true);
+    try {
+      const res = await ApiService.login(email.trim(), password);
+
+      if (res && res.success) {
+        Alert.alert(
+          "Login Successful! 🎉",
+          `Welcome back, ${res.user?.name || "Member"}!`,
+          [
+            {
+              text: "Continue",
+              onPress: () => router.push("/profile"),
+            },
+          ]
+        );
+      } else {
+        // If backend server isn't reachable or invalid credentials
+        Alert.alert(
+          "Notice",
+          res.message || "Could not connect to backend server. Make sure MongoDB and backend are running."
+        );
+      }
+    } catch (err: any) {
+      Alert.alert("Connection Error", "Backend server is currently offline.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
 
 import { COLORS } from "../constants/colors";
+import { ApiService } from "../src/services/api";
 
 export default function RegisterScreen() {
   const insets = useSafeAreaInsets();
@@ -24,25 +25,18 @@ export default function RegisterScreen() {
   );
 
   const [name, setName] = useState("");
-
   const [email, setEmail] = useState("");
-
   const [password, setPassword] = useState("");
-
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [role, setRole] = useState("Team Member");
+  const [loading, setLoading] = useState(false);
 
-  const handleRegister = () => {
-    if (
-      !name ||
-      !email ||
-      !password ||
-      !confirmPassword
-    ) {
+  const handleRegister = async () => {
+    if (!name || !email || !password || !confirmPassword) {
       Alert.alert(
         "Missing Information",
         "Please fill all fields."
       );
-
       return;
     }
 
@@ -51,14 +45,40 @@ export default function RegisterScreen() {
         "Password Error",
         "Passwords do not match."
       );
-
       return;
     }
 
-    Alert.alert(
-      "Frontend Demo",
-      "Backend registration will be connected later."
-    );
+    setLoading(true);
+    try {
+      const res = await ApiService.register({
+        name: name.trim(),
+        email: email.trim(),
+        password,
+        role,
+      });
+
+      if (res && res.success) {
+        Alert.alert(
+          "Account Created! 🎉",
+          `Welcome to TeamUp, ${res.user?.name || name}!`,
+          [
+            {
+              text: "Go to Profile",
+              onPress: () => router.push("/profile"),
+            },
+          ]
+        );
+      } else {
+        Alert.alert(
+          "Notice",
+          res.message || "Registration failed. Check if backend is running."
+        );
+      }
+    } catch (err: any) {
+      Alert.alert("Connection Error", "Backend server is currently offline.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

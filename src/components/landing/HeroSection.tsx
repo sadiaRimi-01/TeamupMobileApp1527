@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import {
   View,
   Text,
-  TextInput,
   TouchableOpacity,
   StyleSheet,
   ScrollView,
@@ -13,10 +12,8 @@ import { router } from "expo-router";
 import { THEME } from "../../constants/theme";
 import Badge from "../common/Badge";
 import Button from "../common/Button";
-import Chip from "../common/Chip";
 import {
   HERO_MEMBERS,
-  POPULAR_SKILLS,
   MARQUEE_ITEMS,
 } from "../../constants/mockData";
 import { TeamMember } from "../../types";
@@ -28,28 +25,7 @@ interface HeroSectionProps {
 }
 
 export default function HeroSection({ onSearch }: HeroSectionProps) {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedSkill, setSelectedSkill] = useState<string>("Java");
   const [invitedMembers, setInvitedMembers] = useState<Record<string, boolean>>({});
-
-  const handleSearchSubmit = () => {
-    if (onSearch) {
-      onSearch(searchQuery);
-    } else {
-      router.push({
-        pathname: "/teams",
-        params: { skill: searchQuery || selectedSkill },
-      } as any);
-    }
-  };
-
-  const handleSkillPress = (skill: string) => {
-    const next = selectedSkill === skill ? "" : skill;
-    setSelectedSkill(next);
-    if (next) {
-      setSearchQuery(next);
-    }
-  };
 
   const toggleInvite = (id: string) => {
     setInvitedMembers((prev) => ({
@@ -86,53 +62,7 @@ export default function HeroSection({ onSearch }: HeroSectionProps) {
         skill, so you spend less time searching and more time building.
       </Text>
 
-      {/* 4. Hero Search Pill */}
-      <View style={styles.searchPill}>
-        <Ionicons
-          name="search-outline"
-          size={20}
-          color={THEME.textMuted}
-          style={styles.searchIcon}
-        />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search by skill: Java, UI/UX, Python..."
-          placeholderTextColor={THEME.textMuted}
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          onSubmitEditing={handleSearchSubmit}
-          returnKeyType="search"
-        />
-        <TouchableOpacity
-          activeOpacity={0.8}
-          style={styles.searchButton}
-          onPress={handleSearchSubmit}
-        >
-          <Text style={styles.searchButtonText}>Search</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* 5. Popular jumping skill pills */}
-      <View style={styles.popularRow}>
-        <Text style={styles.popularLabel}>Popular:</Text>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.skillsScroll}
-        >
-          {POPULAR_SKILLS.map((skill) => (
-            <Chip
-              key={skill}
-              label={skill}
-              size="sm"
-              selected={selectedSkill === skill}
-              onPress={() => handleSkillPress(skill)}
-            />
-          ))}
-        </ScrollView>
-      </View>
-
-      {/* 6. Primary Action Buttons */}
+      {/* 4. Primary Action Buttons */}
       <View style={styles.actionButtonsRow}>
         <View style={{ flex: 1 }}>
           <Button
@@ -342,72 +272,13 @@ const styles = StyleSheet.create({
     color: THEME.textSecondary,
     textAlign: "center",
     marginTop: 14,
-    marginBottom: 24,
-  },
-  searchPill: {
-    marginHorizontal: 18,
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: THEME.white,
-    borderRadius: 50,
-    paddingLeft: 14,
-    paddingRight: 6,
-    paddingVertical: 6,
-    borderWidth: 1.2,
-    borderColor: THEME.cardBorder,
-    shadowColor: THEME.inkDark,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    elevation: 3,
-  },
-  searchIcon: {
-    marginRight: 8,
-  },
-  searchInput: {
-    flex: 1,
-    height: 42,
-    fontSize: 14,
-    color: THEME.inkDark,
-    fontWeight: "600",
-  },
-  searchButton: {
-    backgroundColor: THEME.brandPink,
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    borderRadius: 30,
-    shadowColor: THEME.brandPink,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.35,
-    shadowRadius: 6,
-    elevation: 3,
-  },
-  searchButtonText: {
-    color: THEME.white,
-    fontWeight: "800",
-    fontSize: 13,
-  },
-  popularRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 16,
-    paddingHorizontal: 18,
-  },
-  popularLabel: {
-    fontSize: 12,
-    fontWeight: "800",
-    color: THEME.textMuted,
-    marginRight: 8,
-  },
-  skillsScroll: {
-    gap: 8,
-    paddingRight: 16,
+    marginBottom: 16,
   },
   actionButtonsRow: {
     flexDirection: "row",
     gap: 12,
     marginHorizontal: 18,
-    marginTop: 22,
+    marginTop: 8,
     marginBottom: 28,
   },
   showcaseSection: {

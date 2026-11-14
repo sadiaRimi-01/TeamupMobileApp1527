@@ -25,6 +25,21 @@ export interface ApiResponse<T = any> {
 }
 
 export const ApiService = {
+  // Health Check
+  checkHealth: async (): Promise<{ online: boolean }> => {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3000);
+      const res = await fetch(`${API_BASE_URL}/health`, {
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+      return { online: res.ok };
+    } catch {
+      return { online: false };
+    }
+  },
+
   // Authentication
   login: async (email: string, password: string): Promise<ApiResponse> => {
     try {

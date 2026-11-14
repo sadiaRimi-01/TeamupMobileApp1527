@@ -121,14 +121,31 @@ export default function TeamsScreen() {
 
     if (token) {
       try {
+        const curUser = authStore.getUser();
         const projectsRes = await ApiService.getProjects();
-        const firstProjId = projectsRes.projects?.[0]?._id || "proj_1";
+        let targetProj = null;
+        if (projectsRes.success && Array.isArray(projectsRes.projects) && projectsRes.projects.length > 0) {
+          targetProj = projectsRes.projects.find((p: any) =>
+            curUser && (
+              (p.leader?._id && String(p.leader._id) === String(curUser.id)) ||
+              (p.leader?.email && curUser.email && p.leader.email.toLowerCase() === curUser.email.toLowerCase()) ||
+              (p.leader?.name && curUser.name && p.leader.name.toLowerCase().trim() === curUser.name.toLowerCase().trim()) ||
+              (String(p.leader) === String(curUser.id))
+            )
+          ) || projectsRes.projects[0];
+        }
+
+        const targetProjId = targetProj?._id || "proj_1";
+        const targetProjTitle = targetProj?.title || "Team Collaboration";
+
         await ApiService.applyToProject(
           token,
-          firstProjId,
-          `Team invitation sent to ${m.name}`,
-          m.id || m.name,
-          "Invitation"
+          targetProjId,
+          `You have been invited by ${curUser?.name || "a project leader"} to join the "${targetProjTitle}" team!`,
+          m.id,
+          "Invitation",
+          m.name,
+          (m as any).email
         );
       } catch (e) {
         console.warn("Invite warning:", e);

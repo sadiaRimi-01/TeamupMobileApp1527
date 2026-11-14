@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -14,7 +14,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { THEME } from "../src/constants/theme";
 import { authStore, AuthUser } from "../src/services/authStore";
 import { ApiService } from "../src/services/api";
@@ -174,19 +174,35 @@ export default function MyProjectsScreen() {
     return unsub;
   }, []);
 
-  useEffect(() => {
-    const fetchLiveProjectsAndApplications = async () => {
-      try {
-        const res = await ApiService.getProjects();
-        if (res && res.success && Array.isArray(res.projects) && res.projects.length > 0) {
-          const liveProjects: RunningProject[] = res.projects.map((p: any, idx: number) => {
-            const isUserLead = user ? (
-              (p.leader?._id && String(p.leader._id) === String(user.id)) ||
-              (p.leader?.email && user.email && p.leader.email.toLowerCase() === user.email.toLowerCase()) ||
-              (p.leader?.name && user.name && p.leader.name.toLowerCase().trim() === user.name.toLowerCase().trim()) ||
-              (p.leader && String(p.leader) === String(user.id))
-            ) : false;
+  const fetchLiveProjectsAndApplications = useCallback(async () => {
+    try {
+      const res = await ApiService.getProjects();
+      if (res && res.success && Array.isArray(res.projects) && res.projects.length > 0) {
+        const liveProjects: RunningProject[] = [];
 
+        res.projects.forEach((p: any, idx: number) => {
+          const isUserLead = user ? (
+            (p.leader?._id && String(p.leader._id) === String(user.id)) ||
+            (p.leader?.email && user.email && p.leader.email.toLowerCase() === user.email.toLowerCase()) ||
+            (p.leader?.name && user.name && p.leader.name.toLowerCase().trim() === user.name.toLowerCase().trim()) ||
+            (p.leader && String(p.leader) === String(user.id))
+          ) : false;
+
+          const isUserMember = user ? (
+            Array.isArray(p.members) && p.members.some((m: any) => {
+              const mUserId = m.user?._id || m.user;
+              const mUserName = m.user?.name || m.name;
+              const mUserEmail = m.user?.email || m.email;
+              return (
+                (mUserId && String(mUserId) === String(user.id)) ||
+                (mUserEmail && user.email && mUserEmail.toLowerCase() === user.email.toLowerCase()) ||
+                (mUserName && user.name && mUserName.toLowerCase().trim() === user.name.toLowerCase().trim())
+              );
+            })
+          ) : false;
+
+          // Include project in My Projects if user is Leader OR has joined
+          if (isUserLead || isUserMember) {
             const mappedMembers: TeamMemberProgress[] = [
               {
                 id: p.leader?._id || `lead_${idx}`,
@@ -195,24 +211,32 @@ export default function MyProjectsScreen() {
                 initials: p.leader?.avatarInitials || "PL",
                 progressPct: 80,
               },
-              ...(p.members || []).map((m: any, mIdx: number) => ({
-                id: m._id || m.user?._id || `m_${idx}_${mIdx}`,
-                name: m.user?.name || m.roleName || "Team Member",
-                role: m.roleName || "Contributor",
-                initials: m.user?.avatarInitials || (m.user?.name ? m.user.name.substring(0, 2).toUpperCase() : "TM"),
-                progressPct: 50,
-              })),
+              ...(p.members || []).map((m: any, mIdx: number) => {
+                const mName = m.user?.name || m.name || m.roleName || "Team Member";
+                const isCurrent = user && (
+                  (m.user?._id && String(m.user._id) === String(user.id)) ||
+                  (m.user?.email && user.email && m.user.email.toLowerCase() === user.email.toLowerCase()) ||
+                  (m.user?.name && user.name && m.user.name.toLowerCase().trim() === user.name.toLowerCase().trim())
+                );
+                return {
+                  id: m._id || m.user?._id || `m_${idx}_${mIdx}`,
+                  name: isCurrent ? `${mName} (You)` : mName,
+                  role: m.roleName || (isCurrent ? "Joined Member" : "Contributor"),
+                  initials: m.user?.avatarInitials || (mName ? mName.substring(0, 2).toUpperCase() : "TM"),
+                  progressPct: 50,
+                };
+              }),
             ];
 
-            return {
+            liveProjects.push({
               id: p._id || `proj_${idx}`,
               title: p.title,
               category: p.category || "Development",
               description: p.description,
-              myRole: isUserLead ? "Project Lead" : "Team Member",
+              myRole: isUserLead ? "Project Lead" : "Team Member (Joined)",
               isLead: isUserLead,
               status: p.status === "Completed" ? "Completed" : "Active",
-              progressPct: 65,
+              progressPct: isUserLead ? 65 : 50,
               nextMilestone: `Sprint deliverables due ${p.deadline || "Next week"}`,
               skills: Array.isArray(p.requiredSkills) ? p.requiredSkills : ["React Native"],
               members: mappedMembers,
@@ -222,64 +246,49 @@ export default function MyProjectsScreen() {
                 { id: "m3", title: "Testing, verification and final deployment", dueDate: p.deadline || "Dec 15", done: false },
               ],
               applicants: [],
-            };
-          });
-
-          // Fetch applications for these projects
-          const token = authStore.getToken();
-          if (token) {
-            for (const lp of liveProjects) {
-              try {
-                const appRes = await ApiService.getProjectApplications(token, lp.id);
-                if (appRes && appRes.success && Array.isArray(appRes.applications)) {
-                  lp.applicants = appRes.applications
-                    .filter((a: any) => a.status === "Pending")
-                    .map((a: any) => ({
-                      id: a._id,
-                      name: a.applicant?.name || "Applicant",
-                      role: a.applicant?.role || "Developer",
-                      initials: a.applicant?.avatarInitials || "AP",
-                      matchPct: "92%",
-                      status: "pending",
-                    }));
-                }
-              } catch {}
-            }
+            });
           }
+        });
 
-          const combined = [...liveProjects];
-          INITIAL_RUNNING_PROJECTS.forEach((sample) => {
-            if (!combined.some((item) => item.title.toLowerCase() === sample.title.toLowerCase())) {
-              const isSampleLead = user?.name
-                ? sample.members.some(
-                    (m) => m.role === "Project Lead" && m.name.toLowerCase() === user.name.toLowerCase()
-                  )
-                : false;
-              combined.push({
-                ...sample,
-                isLead: isSampleLead,
-                myRole: isSampleLead ? "Project Lead" : "Contributor",
-              });
-            }
-          });
-          setProjects(combined);
-        } else {
-          const sampleWithLead = INITIAL_RUNNING_PROJECTS.map((sp) => {
+        // Fetch applications for these projects
+        const token = authStore.getToken();
+        if (token) {
+          for (const lp of liveProjects) {
+            try {
+              const appRes = await ApiService.getProjectApplications(token, lp.id);
+              if (appRes && appRes.success && Array.isArray(appRes.applications)) {
+                lp.applicants = appRes.applications
+                  .filter((a: any) => a.status === "Pending")
+                  .map((a: any) => ({
+                    id: a._id,
+                    name: a.applicant?.name || "Applicant",
+                    role: a.applicant?.role || "Developer",
+                    initials: a.applicant?.avatarInitials || "AP",
+                    matchPct: "92%",
+                    status: "pending",
+                  }));
+              }
+            } catch {}
+          }
+        }
+
+        const combined = [...liveProjects];
+        INITIAL_RUNNING_PROJECTS.forEach((sample) => {
+          if (!combined.some((item) => item.title.toLowerCase() === sample.title.toLowerCase())) {
             const isSampleLead = user?.name
-              ? sp.members.some(
+              ? sample.members.some(
                   (m) => m.role === "Project Lead" && m.name.toLowerCase() === user.name.toLowerCase()
                 )
               : false;
-            return {
-              ...sp,
+            combined.push({
+              ...sample,
               isLead: isSampleLead,
               myRole: isSampleLead ? "Project Lead" : "Contributor",
-            };
-          });
-          setProjects(sampleWithLead);
-        }
-      } catch (err) {
-        console.warn("MyProjects fetch error:", err);
+            });
+          }
+        });
+        setProjects(combined);
+      } else {
         const sampleWithLead = INITIAL_RUNNING_PROJECTS.map((sp) => {
           const isSampleLead = user?.name
             ? sp.members.some(
@@ -294,10 +303,33 @@ export default function MyProjectsScreen() {
         });
         setProjects(sampleWithLead);
       }
-    };
-
-    fetchLiveProjectsAndApplications();
+    } catch (err) {
+      console.warn("MyProjects fetch error:", err);
+      const sampleWithLead = INITIAL_RUNNING_PROJECTS.map((sp) => {
+        const isSampleLead = user?.name
+          ? sp.members.some(
+              (m) => m.role === "Project Lead" && m.name.toLowerCase() === user.name.toLowerCase()
+            )
+          : false;
+        return {
+          ...sp,
+          isLead: isSampleLead,
+          myRole: isSampleLead ? "Project Lead" : "Contributor",
+        };
+      });
+      setProjects(sampleWithLead);
+    }
   }, [user]);
+
+  useEffect(() => {
+    fetchLiveProjectsAndApplications();
+  }, [fetchLiveProjectsAndApplications]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchLiveProjectsAndApplications();
+    }, [fetchLiveProjectsAndApplications])
+  );
 
   // Filter projects by active tab
   const filteredProjects = projects.filter((p) => {

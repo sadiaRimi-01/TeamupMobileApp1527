@@ -8,7 +8,7 @@ const User = require("../models/User");
 // @access  Private
 exports.applyToProject = async (req, res) => {
   try {
-    const { coverNote, candidateId, type } = req.body;
+    const { coverNote, candidateId, candidateName, candidateEmail, type } = req.body;
     let projectId = req.params.projectId;
 
     let project = null;
@@ -16,8 +16,7 @@ exports.applyToProject = async (req, res) => {
       project = await Project.findById(projectId);
     }
     if (!project) {
-      // Fallback: match by title or find first project in DB
-      project = await Project.findOne();
+      project = (await Project.findOne({ leader: req.user.id })) || (await Project.findOne());
     }
     if (!project) {
       const leader = (await User.findOne({ email: "sarah@teamup.com" })) || (await User.findOne());
@@ -31,36 +30,46 @@ exports.applyToProject = async (req, res) => {
     }
 
     let applicantId = req.user.id;
-    let inviterId = project.leader;
+    let inviterId = project.leader || req.user.id;
     let appType = type || "Application";
 
-    // If candidateId is provided, this is an Invitation to that candidate
-    if (candidateId) {
+    // If candidateId or candidateName is provided, this is an Invitation to that candidate
+    if (candidateId || candidateName) {
       appType = "Invitation";
       inviterId = req.user.id;
 
-      if (mongoose.isValidObjectId(candidateId)) {
-        applicantId = candidateId;
-      } else {
-        // Search user by name or email
-        let candidateUser =
-          (await User.findOne({ name: new RegExp(candidateId, "i") })) ||
-          (await User.findOne({ email: new RegExp(candidateId, "i") }));
-
-        if (!candidateUser) {
-          const clean = candidateId.replace(/\s+/g, "").toLowerCase();
-          candidateUser = await User.create({
-            name: candidateId,
-            email: `${clean}@teamup.com`,
-            password: "password123",
-            role: "Team Member",
-            skills: ["React Native", "TypeScript", "Node.js"],
-            university: "University",
-            avatarInitials: candidateId.substring(0, 2).toUpperCase(),
-          });
-        }
-        applicantId = candidateUser._id;
+      let candidateUser = null;
+      if (candidateId && mongoose.isValidObjectId(candidateId)) {
+        candidateUser = await User.findById(candidateId);
       }
+
+      if (!candidateUser && candidateEmail) {
+        candidateUser = await User.findOne({ email: candidateEmail.toLowerCase().trim() });
+      }
+
+      const lookupName = candidateName || candidateId;
+      if (!candidateUser && lookupName && typeof lookupName === "string") {
+        candidateUser =
+          (await User.findOne({ name: new RegExp(`^${lookupName.trim()}$`, "i") })) ||
+          (await User.findOne({ name: new RegExp(lookupName.trim(), "i") })) ||
+          (await User.findOne({ email: new RegExp(lookupName.trim(), "i") }));
+      }
+
+      if (!candidateUser) {
+        const cleanName = (candidateName || candidateId || "Candidate").trim();
+        const cleanEmail = candidateEmail ? candidateEmail.toLowerCase().trim() : `${cleanName.replace(/\s+/g, "").toLowerCase()}@teamup.com`;
+        candidateUser = await User.create({
+          name: cleanName,
+          email: cleanEmail,
+          password: "password123",
+          role: "Team Member",
+          skills: ["React Native", "TypeScript", "Node.js"],
+          university: "University",
+          avatarInitials: cleanName.substring(0, 2).toUpperCase(),
+        });
+      }
+
+      applicantId = candidateUser._id;
     }
 
     // Check if application/invitation already exists
@@ -110,18 +119,36 @@ exports.applyToProject = async (req, res) => {
 // @access  Private
 exports.getMyInvitations = async (req, res) => {
   try {
+    const user = await User.findById(req.user.id);
+    let orConditions = [{ applicant: req.user.id }];
+
+    if (user) {
+      const matchingUsers = await User.find({
+        $or: [
+          { email: user.email.toLowerCase() },
+          { name: new RegExp(`^${user.name}$`, "i") },
+        ],
+      }).select("_id");
+
+      const userIds = matchingUsers.map((u) => u._id);
+      orConditions.push({ applicant: { $in: userIds } });
+    }
+
     const invitations = await Application.find({
-      applicant: req.user.id,
+      $or: orConditions,
       type: "Invitation",
+      status: "Pending",
     })
-      .populate("project", "title category description leader deadline maxTeamSize")
+      .populate("project", "title category description leader deadline maxTeamSize requiredSkills")
       .populate("inviter", "name email avatarInitials university role")
       .sort({ createdAt: -1 });
 
+    const validInvitations = invitations.filter((i) => i.project != null);
+
     res.status(200).json({
       success: true,
-      count: invitations.length,
-      invitations,
+      count: validInvitations.length,
+      invitations: validInvitations,
     });
   } catch (error) {
     res.status(500).json({
@@ -195,12 +222,16 @@ exports.updateApplicationStatus = async (req, res) => {
     if (status === "Accepted" && application.project) {
       const project = await Project.findById(application.project._id);
       if (project) {
+        const userIdToAdd = req.user ? (req.user._id || req.user.id) : application.applicant;
         const alreadyIn = project.members.some(
-          (m) => m.user && m.user.toString() === application.applicant.toString()
+          (m) =>
+            m.user &&
+            (m.user.toString() === userIdToAdd.toString() ||
+              m.user.toString() === application.applicant.toString())
         );
         if (!alreadyIn) {
           project.members.push({
-            user: application.applicant,
+            user: userIdToAdd,
             roleName: roleName || "Team Member",
             joinedAt: new Date(),
           });

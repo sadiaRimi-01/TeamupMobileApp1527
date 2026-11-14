@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -14,7 +14,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { THEME } from "../src/constants/theme";
 import { authStore, AuthUser } from "../src/services/authStore";
 import { ApiService } from "../src/services/api";
@@ -67,6 +67,12 @@ export default function ProfileScreen() {
   useEffect(() => {
     fetchInvitations();
   }, [currentUser]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchInvitations();
+    }, [currentUser])
+  );
 
   const openEditModal = () => {
     if (currentUser) {
@@ -138,14 +144,27 @@ export default function ProfileScreen() {
       if (action === "accept") {
         await ApiService.updateApplicationStatus(token, inviteId, "Accepted");
         setInvitations((prev) => prev.filter((i) => i._id !== inviteId));
-        Alert.alert("Invitation Accepted! 🎉", "You are now a team member of this project!");
+        Alert.alert(
+          "Invitation Accepted! 🎉",
+          "You are now an active team member! This project has been added to your My Projects workspace.",
+          [
+            {
+              text: "View in My Projects",
+              onPress: () => router.push("/my-projects"),
+            },
+            { text: "OK", style: "cancel" },
+          ]
+        );
       } else {
-        await ApiService.deleteApplication(token, inviteId);
+        await ApiService.updateApplicationStatus(token, inviteId, "Rejected");
+        try {
+          await ApiService.deleteApplication(token, inviteId);
+        } catch {}
         setInvitations((prev) => prev.filter((i) => i._id !== inviteId));
         Alert.alert("Invitation Cancelled", "The team invitation has been declined.");
       }
-    } catch {
-      Alert.alert("Notice", "Updated invitation status.");
+    } catch (err: any) {
+      Alert.alert("Notice", err.message || "Failed to update invitation status.");
     }
   };
 
@@ -492,15 +511,32 @@ export default function ProfileScreen() {
                     </View>
                   </View>
 
+                  {inv.project?.description ? (
+                    <Text style={styles.inviteDesc} numberOfLines={3}>
+                      {inv.project.description}
+                    </Text>
+                  ) : null}
+
                   <Text style={styles.inviteNote}>
                     {inv.coverNote || "You have been invited to join this project team."}
                   </Text>
 
                   {inv.inviter?.name && (
-                    <Text style={styles.inviterText}>
-                      Invited by: <Text style={{ fontWeight: "800", color: THEME.inkDark }}>{inv.inviter.name}</Text>
-                    </Text>
+                    <View style={styles.inviterInfoRow}>
+                      <Ionicons name="person-circle-outline" size={16} color={THEME.secondary} />
+                      <Text style={styles.inviterText}>
+                        Invited by: <Text style={{ fontWeight: "800", color: THEME.inkDark }}>{inv.inviter.name}</Text>
+                        {inv.inviter?.university ? ` (${inv.inviter.university})` : ""}
+                      </Text>
+                    </View>
                   )}
+
+                  {inv.project?.deadline && inv.project.deadline !== "TBD" ? (
+                    <View style={styles.inviteDeadlineRow}>
+                      <Ionicons name="calendar-outline" size={14} color={THEME.textMuted} />
+                      <Text style={styles.inviteDeadlineText}>Deadline: {inv.project.deadline}</Text>
+                    </View>
+                  ) : null}
 
                   <View style={styles.inviteActionRow}>
                     <TouchableOpacity
@@ -516,7 +552,7 @@ export default function ProfileScreen() {
                       onPress={() => handleInvitationAction(inv._id, "decline")}
                     >
                       <Ionicons name="close-circle-outline" size={16} color="#EF4444" />
-                      <Text style={styles.declineInviteBtnText}>Decline</Text>
+                      <Text style={styles.declineInviteBtnText}>Cancel</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -1103,10 +1139,32 @@ const styles = StyleSheet.create({
     color: THEME.textSecondary,
     marginBottom: 8,
   },
+  inviteDesc: {
+    fontSize: 12,
+    color: THEME.textSecondary,
+    lineHeight: 18,
+    marginBottom: 8,
+  },
+  inviterInfoRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 6,
+  },
   inviterText: {
     fontSize: 12,
     color: THEME.textMuted,
+  },
+  inviteDeadlineRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
     marginBottom: 12,
+  },
+  inviteDeadlineText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: THEME.textMuted,
   },
   inviteActionRow: {
     flexDirection: "row",

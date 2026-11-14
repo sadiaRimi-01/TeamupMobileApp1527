@@ -38,19 +38,33 @@ export default function MatchDemoSection() {
     setInvitedMap((prev) => ({ ...prev, [candidateName]: true }));
 
     const token = authStore.getToken();
+    const curUser = authStore.getUser();
     if (token) {
       try {
         const projectsRes = await ApiService.getProjects();
+        let targetProj = null;
         if (projectsRes.success && projectsRes.projects && projectsRes.projects.length > 0) {
-          const firstProjId = projectsRes.projects[0]._id;
-          await ApiService.applyToProject(
-            token,
-            firstProjId,
-            `Smart Match Engine invitation sent to ${candidateName}`,
-            candidateName,
-            "Invitation"
-          );
+          targetProj = projectsRes.projects.find((p: any) =>
+            curUser && (
+              (p.leader?._id && String(p.leader._id) === String(curUser.id)) ||
+              (p.leader?.email && curUser.email && p.leader.email.toLowerCase() === curUser.email.toLowerCase()) ||
+              (p.leader?.name && curUser.name && p.leader.name.toLowerCase() === curUser.name.toLowerCase()) ||
+              (String(p.leader) === String(curUser.id))
+            )
+          ) || projectsRes.projects[0];
         }
+
+        const targetProjId = targetProj?._id || "proj_1";
+        const targetProjTitle = targetProj?.title || "Smart Campus Initiative";
+
+        await ApiService.applyToProject(
+          token,
+          targetProjId,
+          `Smart Match Engine invitation sent to join "${targetProjTitle}".`,
+          undefined,
+          "Invitation",
+          candidateName
+        );
       } catch (err) {
         console.warn("MatchDemo Invite API error:", err);
       }

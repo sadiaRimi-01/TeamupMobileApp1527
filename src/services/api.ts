@@ -190,7 +190,9 @@ export const ApiService = {
     projectId: string,
     coverNote?: string,
     candidateId?: string,
-    type?: "Application" | "Invitation"
+    type?: "Application" | "Invitation",
+    candidateName?: string,
+    candidateEmail?: string
   ): Promise<ApiResponse> => {
     try {
       const res = await fetch(`${API_BASE_URL}/applications/${projectId}`, {
@@ -199,7 +201,7 @@ export const ApiService = {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ coverNote, candidateId, type }),
+        body: JSON.stringify({ coverNote, candidateId, type, candidateName, candidateEmail }),
       });
       return await res.json();
     } catch (err: any) {

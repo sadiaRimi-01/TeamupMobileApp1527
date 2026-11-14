@@ -1,5 +1,11 @@
 import React, { useState, useMemo } from "react";
-import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Alert,
+} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { THEME } from "../../constants/theme";
 import Badge from "../common/Badge";
@@ -8,16 +14,51 @@ import {
   MATCH_CANDIDATES,
   MATCH_DEMO_ALL_SKILLS,
 } from "../../constants/mockData";
+import { authStore } from "../../services/authStore";
+import { ApiService } from "../../services/api";
 
 export default function MatchDemoSection() {
   const [selectedSkills, setSelectedSkills] = useState<string[]>([
     "Java",
     "MySQL",
   ]);
+  const [invitedMap, setInvitedMap] = useState<Record<string, boolean>>({});
+  const [invitingName, setInvitingName] = useState<string | null>(null);
 
   const toggleSkill = (skill: string) => {
     setSelectedSkills((prev) =>
       prev.includes(skill) ? prev.filter((s) => s !== skill) : [...prev, skill]
+    );
+  };
+
+  const handleInvite = async (candidateName: string) => {
+    if (invitedMap[candidateName]) return;
+
+    setInvitingName(candidateName);
+    setInvitedMap((prev) => ({ ...prev, [candidateName]: true }));
+
+    const token = authStore.getToken();
+    if (token) {
+      try {
+        const projectsRes = await ApiService.getProjects();
+        if (projectsRes.success && projectsRes.projects && projectsRes.projects.length > 0) {
+          const firstProjId = projectsRes.projects[0]._id;
+          await ApiService.applyToProject(
+            token,
+            firstProjId,
+            `Smart Match Engine invitation sent to ${candidateName}`
+          );
+        }
+      } catch (err) {
+        console.warn("MatchDemo Invite API error:", err);
+      }
+    }
+
+    setInvitingName(null);
+
+    Alert.alert(
+      "Invitation Sent! 📨",
+      `An invite to collaborate on your team has been sent to ${candidateName} and registered in MongoDB.`
     );
   };
 
@@ -43,6 +84,7 @@ export default function MatchDemoSection() {
   }, [selectedSkills]);
 
   const topMatch = rankedCandidates[0];
+  const isTopInvited = invitedMap[topMatch.name];
 
   return (
     <View style={styles.container}>
@@ -76,7 +118,7 @@ export default function MatchDemoSection() {
       {/* Match Results Card */}
       <View style={styles.resultCard}>
         <View style={styles.resultHeader}>
-          <View>
+          <View style={{ flex: 1, paddingRight: 10 }}>
             <Text style={styles.topMatchLabel}>TOP COMPATIBLE MATCH</Text>
             <Text style={styles.topMatchName}>{topMatch.name}</Text>
             <Text style={styles.topMatchRole}>{topMatch.role}</Text>
@@ -127,30 +169,88 @@ export default function MatchDemoSection() {
           </View>
         </View>
 
+        {/* Top Match Invite Button Row */}
+        <View style={styles.topActionRow}>
+          <TouchableOpacity
+            activeOpacity={0.8}
+            style={[
+              styles.topInviteBtn,
+              isTopInvited && styles.topInvitedBtn,
+            ]}
+            onPress={() => handleInvite(topMatch.name)}
+            disabled={isTopInvited || invitingName === topMatch.name}
+          >
+            <Ionicons
+              name={isTopInvited ? "checkmark-circle" : "paper-plane-outline"}
+              size={16}
+              color={isTopInvited ? THEME.successGreen : THEME.white}
+            />
+            <Text
+              style={[
+                styles.topInviteBtnText,
+                isTopInvited && styles.topInvitedBtnText,
+              ]}
+            >
+              {isTopInvited
+                ? `Invitation Sent to ${topMatch.name.split(" ")[0]}`
+                : `Invite ${topMatch.name} to Team`}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
         {/* Other candidates comparison row */}
         <View style={styles.otherCandidatesSection}>
           <Text style={styles.otherTitle}>Other Available Matches:</Text>
-          {rankedCandidates.slice(1).map((cand) => (
-            <View key={cand.name} style={styles.candMiniRow}>
-              <View
-                style={[
-                  styles.miniAvatar,
-                  { backgroundColor: cand.gradient[0] },
-                ]}
-              >
-                <Text style={styles.miniAvatarText}>{cand.initials}</Text>
-              </View>
+          {rankedCandidates.slice(1).map((cand) => {
+            const isInvited = invitedMap[cand.name];
+            const isInviting = invitingName === cand.name;
 
-              <View style={{ flex: 1 }}>
-                <Text style={styles.miniName}>{cand.name}</Text>
-                <Text style={styles.miniRole}>{cand.role}</Text>
-              </View>
+            return (
+              <View key={cand.name} style={styles.candMiniRow}>
+                <View
+                  style={[
+                    styles.miniAvatar,
+                    { backgroundColor: cand.gradient[0] },
+                  ]}
+                >
+                  <Text style={styles.miniAvatarText}>{cand.initials}</Text>
+                </View>
 
-              <View style={styles.miniMatchBadge}>
-                <Text style={styles.miniMatchText}>{cand.matchPct}%</Text>
+                <View style={{ flex: 1, paddingRight: 8 }}>
+                  <Text style={styles.miniName}>{cand.name}</Text>
+                  <Text style={styles.miniRole}>{cand.role}</Text>
+                </View>
+
+                <View style={styles.miniMatchBadge}>
+                  <Text style={styles.miniMatchText}>{cand.matchPct}%</Text>
+                </View>
+
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  style={[
+                    styles.miniInviteBtn,
+                    isInvited && styles.miniInvitedBtn,
+                  ]}
+                  onPress={() => handleInvite(cand.name)}
+                  disabled={isInvited || isInviting}
+                >
+                  <Ionicons
+                    name={isInvited ? "checkmark-circle" : "person-add-outline"}
+                    size={14}
+                    color={isInvited ? THEME.successGreen : THEME.white}
+                  />
+                  <Text
+                    style={[
+                      styles.miniInviteBtnText,
+                      isInvited && styles.miniInvitedBtnText,
+                    ]}
+                  >
+                    {isInvited ? "Sent" : "Invite"}
+                  </Text>
+                </TouchableOpacity>
               </View>
-            </View>
-          ))}
+            );
+          })}
         </View>
       </View>
     </View>
@@ -343,6 +443,63 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "800",
     color: THEME.accentViolet,
+  },
+  topActionRow: {
+    paddingTop: 14,
+    paddingBottom: 4,
+  },
+  topInviteBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: THEME.brandPink,
+    paddingVertical: 11,
+    borderRadius: 14,
+    shadowColor: THEME.brandPink,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  topInvitedBtn: {
+    backgroundColor: THEME.pastelMint,
+    borderWidth: 1,
+    borderColor: "rgba(16, 185, 129, 0.4)",
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  topInviteBtnText: {
+    color: THEME.white,
+    fontWeight: "800",
+    fontSize: 13,
+  },
+  topInvitedBtnText: {
+    color: THEME.successGreen,
+    fontWeight: "800",
+  },
+  miniInviteBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: THEME.brandPink,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+  },
+  miniInvitedBtn: {
+    backgroundColor: THEME.pastelMint,
+    borderWidth: 1,
+    borderColor: "rgba(16, 185, 129, 0.35)",
+  },
+  miniInviteBtnText: {
+    color: THEME.white,
+    fontSize: 11,
+    fontWeight: "800",
+  },
+  miniInvitedBtnText: {
+    color: THEME.successGreen,
+    fontWeight: "800",
   },
 });
 

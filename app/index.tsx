@@ -18,9 +18,7 @@ import MatchDemoSection from "../src/components/landing/MatchDemoSection";
 import FeaturesSection from "../src/components/landing/FeaturesSection";
 import AudienceSection from "../src/components/landing/AudienceSection";
 import CompareSection from "../src/components/landing/CompareSection";
-import NumbersSection from "../src/components/landing/NumbersSection";
 import FaqSection from "../src/components/landing/FaqSection";
-import CtaSection from "../src/components/landing/CtaSection";
 import FooterSection from "../src/components/landing/FooterSection";
 
 export default function HomeScreen() {
@@ -95,22 +93,12 @@ export default function HomeScreen() {
           <CompareSection />
         </View>
 
-        {/* 8. Key Stats Strip */}
-        <View onLayout={(e) => handleLayout("numbers", e)}>
-          <NumbersSection />
-        </View>
-
-        {/* 9. FAQ Accordion */}
+        {/* 8. FAQ Accordion */}
         <View onLayout={(e) => handleLayout("faq", e)}>
           <FaqSection />
         </View>
 
-        {/* 10. Call To Action (Early Access) */}
-        <View onLayout={(e) => handleLayout("cta", e)}>
-          <CtaSection />
-        </View>
-
-        {/* 11. Footer */}
+        {/* 9. Footer */}
         <View onLayout={(e) => handleLayout("footer", e)}>
           <FooterSection onScrollToSection={handleScrollToSection} />
         </View>

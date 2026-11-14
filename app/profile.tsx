@@ -378,25 +378,33 @@ export default function ProfileScreen() {
         {/* Tab Content: Skills */}
         {activeTab === "skills" && (
           <View style={styles.tabContentCard}>
-            <Text style={styles.cardSectionTitle}>Verified Technical Skills</Text>
-            <View style={styles.skillsGrid}>
-              {[
-                { name: "Java Full-Stack", verified: true, level: "Expert" },
-                { name: "React Native", verified: true, level: "Advanced" },
-                { name: "Spring Boot", verified: true, level: "Expert" },
-                { name: "Node.js & Express", verified: true, level: "Advanced" },
-                { name: "MongoDB & PostgreSQL", verified: true, level: "Advanced" },
-                { name: "UI/UX & Figma", verified: true, level: "Intermediate" },
-              ].map((s) => (
-                <View key={s.name} style={styles.skillItem}>
-                  <View style={styles.skillHeader}>
-                    <Text style={styles.skillName}>{s.name}</Text>
-                    <Ionicons name="checkmark-circle" size={14} color={THEME.successGreen} />
-                  </View>
-                  <Text style={styles.skillLevel}>{s.level}</Text>
-                </View>
-              ))}
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <Text style={styles.cardSectionTitle}>My Technical Skills</Text>
+              <TouchableOpacity onPress={openEditModal}>
+                <Text style={{ fontSize: 12, fontWeight: "800", color: THEME.secondary }}>+ Edit Skills</Text>
+              </TouchableOpacity>
             </View>
+
+            {currentUser?.skills && currentUser.skills.length > 0 ? (
+              <View style={styles.skillsGrid}>
+                {currentUser.skills.map((skillName, idx) => (
+                  <View key={`${skillName}_${idx}`} style={styles.skillItem}>
+                    <View style={styles.skillHeader}>
+                      <Text style={styles.skillName}>{skillName}</Text>
+                      <Ionicons name="checkmark-circle" size={14} color={THEME.successGreen} />
+                    </View>
+                    <Text style={styles.skillLevel}>Verified</Text>
+                  </View>
+                ))}
+              </View>
+            ) : (
+              <View style={{ paddingVertical: 24, alignItems: "center" }}>
+                <Ionicons name="bulb-outline" size={32} color={THEME.textMuted} />
+                <Text style={{ fontSize: 13, color: THEME.textMuted, marginTop: 8, textAlign: "center" }}>
+                  No skills added yet. Tap "+ Edit Skills" above to add your technical skills!
+                </Text>
+              </View>
+            )}
           </View>
         )}
 

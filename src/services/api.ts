@@ -160,6 +160,21 @@ export const ApiService = {
     }
   },
 
+  removeProjectMember: async (token: string, projectId: string, memberId: string): Promise<ApiResponse> => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/projects/${projectId}/members/${memberId}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, message: err.message || "Failed to remove member" };
+    }
+  },
+
   getProjectById: async (id: string): Promise<ApiResponse> => {
     try {
       const res = await fetch(`${API_BASE_URL}/projects/${id}`);

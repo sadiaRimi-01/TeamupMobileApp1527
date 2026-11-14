@@ -65,30 +65,24 @@ export default function TeamsScreen() {
           }));
         }
 
-        // Add current logged-in user if not already in list
         const curUser = authStore.getUser();
-        if (curUser && !liveMembers.some((m) => m.name.toLowerCase() === curUser.name.toLowerCase())) {
-          liveMembers.unshift({
-            id: curUser.id || `u_curr`,
-            name: curUser.name,
-            role: curUser.role || "Team Member",
-            skills: Array.isArray(curUser.skills) && curUser.skills.length > 0 ? curUser.skills : ["React Native", "JavaScript"],
-            university: curUser.university || "University",
-            matchPct: 99,
-            rating: curUser.rating || 5.0,
-            reviewCount: curUser.reviewCount || 1,
-            initials: curUser.avatarInitials || (curUser.name ? curUser.name.substring(0, 2).toUpperCase() : "ME"),
-            bio: "Active builder ready to join teams and ship projects.",
-            gradient: [THEME.primary, THEME.secondary],
-          });
-        }
 
-        const combined = [...liveMembers];
-        HERO_MEMBERS.forEach((m) => {
-          if (!combined.some((item) => item.name.toLowerCase() === m.name.toLowerCase())) {
+        // Combine live users from MongoDB and heroes, excluding current user
+        const combined: TeamMember[] = [];
+        
+        liveMembers.forEach((m) => {
+          if (!curUser || (m.name.toLowerCase() !== curUser.name.toLowerCase() && m.id !== curUser.id)) {
             combined.push(m);
           }
         });
+
+        HERO_MEMBERS.forEach((m) => {
+          const isMe = curUser && m.name.toLowerCase() === curUser.name.toLowerCase();
+          if (!isMe && !combined.some((item) => item.name.toLowerCase() === m.name.toLowerCase())) {
+            combined.push(m);
+          }
+        });
+
         setMembers(combined);
       } catch {
         // Fallback to static mock
@@ -99,6 +93,10 @@ export default function TeamsScreen() {
   }, [search]);
 
   const filteredMembers = members.filter((m) => {
+    const curUser = authStore.getUser();
+    if (curUser && (m.name.toLowerCase() === curUser.name.toLowerCase() || m.id === curUser.id)) {
+      return false;
+    }
     const matchesFilter =
       selectedFilter === "All" ||
       m.skills.some((s) => s.toLowerCase() === selectedFilter.toLowerCase());

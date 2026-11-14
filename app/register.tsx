@@ -30,8 +30,28 @@ export default function RegisterScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [university, setUniversity] = useState("");
+  const [selectedSkills, setSelectedSkills] = useState<string[]>(["React Native"]);
+  const [customSkills, setCustomSkills] = useState("");
   const [loading, setLoading] = useState(false);
   const [backendOnline, setBackendOnline] = useState<boolean | null>(null);
+
+  const POPULAR_SKILLS = [
+    "Java",
+    "React Native",
+    "Python",
+    "UI/UX",
+    "Node.js",
+    "MySQL",
+    "TypeScript",
+    "Machine Learning",
+  ];
+
+  const toggleSkill = (skill: string) => {
+    setSelectedSkills((prev) =>
+      prev.includes(skill) ? prev.filter((s) => s !== skill) : [...prev, skill]
+    );
+  };
 
   useEffect(() => {
     ApiService.checkHealth().then((res) => {
@@ -66,11 +86,21 @@ export default function RegisterScreen() {
 
     setLoading(true);
 
+    const allSkills = [...selectedSkills];
+    if (customSkills.trim()) {
+      customSkills.split(",").forEach((s) => {
+        const trimmed = s.trim();
+        if (trimmed && !allSkills.includes(trimmed)) allSkills.push(trimmed);
+      });
+    }
+
     try {
       const res = await ApiService.register({
         name: name.trim(),
         email: email.trim().toLowerCase(),
         password,
+        university: university.trim() || "University Student",
+        skills: allSkills.length > 0 ? allSkills : ["React Native", "TypeScript"],
       });
 
       if (res && res.success && res.token && res.user) {
@@ -108,8 +138,8 @@ export default function RegisterScreen() {
             name: name.trim(),
             email: email.trim().toLowerCase(),
             role: "Team Member" as const,
-            university: "University Student",
-            skills: ["React Native", "TypeScript"],
+            university: university.trim() || "University Student",
+            skills: allSkills.length > 0 ? allSkills : ["React Native", "TypeScript"],
             rating: 5.0,
             reviewCount: 0,
             avatarInitials: initials,
@@ -233,6 +263,46 @@ export default function RegisterScreen() {
         secureTextEntry
       />
 
+      <TextInput
+        style={styles.input}
+        placeholder="University / College (e.g. BUET, DU, NSU)"
+        placeholderTextColor={COLORS.textSecondary}
+        value={university}
+        onChangeText={setUniversity}
+      />
+
+      {/* Skills Picker */}
+      <View style={styles.skillsSection}>
+        <Text style={styles.skillsLabel}>Choose Your Primary Skills:</Text>
+        <View style={styles.skillsChipsRow}>
+          {POPULAR_SKILLS.map((skill) => {
+            const isSelected = selectedSkills.includes(skill);
+            return (
+              <TouchableOpacity
+                key={skill}
+                style={[styles.skillChip, isSelected && styles.skillChipActive]}
+                onPress={() => toggleSkill(skill)}
+              >
+                {isSelected && (
+                  <Ionicons name="checkmark" size={14} color={THEME.white} style={{ marginRight: 4 }} />
+                )}
+                <Text style={[styles.skillChipText, isSelected && styles.skillChipTextActive]}>
+                  {skill}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </View>
+
+      <TextInput
+        style={styles.input}
+        placeholder="Other skills (e.g. Docker, Figma, C++)"
+        placeholderTextColor={COLORS.textSecondary}
+        value={customSkills}
+        onChangeText={setCustomSkills}
+      />
+
       <TouchableOpacity
         style={styles.button}
         onPress={handleRegister}
@@ -350,6 +420,49 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     backgroundColor: "#F9FAFB",
     fontSize: 14,
+  },
+
+  skillsSection: {
+    marginBottom: 14,
+  },
+
+  skillsLabel: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: THEME.inkDark,
+    marginBottom: 8,
+  },
+
+  skillsChipsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+
+  skillChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 20,
+    backgroundColor: "#F3F4F6",
+    borderWidth: 1,
+    borderColor: THEME.cardBorder,
+  },
+
+  skillChipActive: {
+    backgroundColor: THEME.primary,
+    borderColor: THEME.primary,
+  },
+
+  skillChipText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: THEME.inkDark,
+  },
+
+  skillChipTextActive: {
+    color: THEME.white,
   },
 
   button: {

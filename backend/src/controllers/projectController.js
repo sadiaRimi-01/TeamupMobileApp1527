@@ -167,6 +167,33 @@ exports.updateProject = async (req, res) => {
   }
 };
 
+// @desc    Remove a member from project
+// @route   DELETE /api/projects/:id/members/:memberId
+// @access  Private
+exports.removeMember = async (req, res) => {
+  try {
+    const project = await Project.findById(req.params.id);
+    if (!project) {
+      return res.status(404).json({ success: false, message: "Project not found" });
+    }
+
+    project.members = project.members.filter(
+      (m) =>
+        m._id.toString() !== req.params.memberId &&
+        (m.user ? m.user.toString() !== req.params.memberId : true)
+    );
+    await project.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Member removed from project",
+      project,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 // @desc    Delete project
 // @route   DELETE /api/projects/:id
 // @access  Private (Leader or Admin)

@@ -66,8 +66,8 @@ const INITIAL_RUNNING_PROJECTS: RunningProject[] = [
     category: "Campus life",
     description:
       "Centralized campus social hub discovering events, study hubs, and peer workshops in real-time.",
-    myRole: "Project Lead & Full-Stack Developer",
-    isLead: true,
+    myRole: "Contributor",
+    isLead: false,
     status: "Active",
     progressPct: 68,
     nextMilestone: "Finalize event API contract with backend team (Due Nov 28)",
@@ -96,8 +96,8 @@ const INITIAL_RUNNING_PROJECTS: RunningProject[] = [
     category: "Mobile & AI",
     description:
       "Cross-platform indoor routing mobile application with graph pathfinding algorithms and beacon telemetry.",
-    myRole: "Lead System Architect",
-    isLead: true,
+    myRole: "Contributor",
+    isLead: false,
     status: "Active",
     progressPct: 54,
     nextMilestone: "Integrate A* shortest path algorithm with beacon telemetry",
@@ -180,9 +180,12 @@ export default function MyProjectsScreen() {
         const res = await ApiService.getProjects();
         if (res && res.success && Array.isArray(res.projects) && res.projects.length > 0) {
           const liveProjects: RunningProject[] = res.projects.map((p: any, idx: number) => {
-            const isUserLead = user?.name
-              ? p.leader?.name?.toLowerCase().includes(user.name.toLowerCase())
-              : true;
+            const isUserLead = user ? (
+              (p.leader?._id && String(p.leader._id) === String(user.id)) ||
+              (p.leader?.email && user.email && p.leader.email.toLowerCase() === user.email.toLowerCase()) ||
+              (p.leader?.name && user.name && p.leader.name.toLowerCase().trim() === user.name.toLowerCase().trim()) ||
+              (p.leader && String(p.leader) === String(user.id))
+            ) : false;
 
             const mappedMembers: TeamMemberProgress[] = [
               {
@@ -193,10 +196,10 @@ export default function MyProjectsScreen() {
                 progressPct: 80,
               },
               ...(p.members || []).map((m: any, mIdx: number) => ({
-                id: m.user?._id || `m_${idx}_${mIdx}`,
+                id: m._id || m.user?._id || `m_${idx}_${mIdx}`,
                 name: m.user?.name || m.roleName || "Team Member",
                 role: m.roleName || "Contributor",
-                initials: m.user?.avatarInitials || "TM",
+                initials: m.user?.avatarInitials || (m.user?.name ? m.user.name.substring(0, 2).toUpperCase() : "TM"),
                 progressPct: 50,
               })),
             ];
@@ -247,13 +250,49 @@ export default function MyProjectsScreen() {
           const combined = [...liveProjects];
           INITIAL_RUNNING_PROJECTS.forEach((sample) => {
             if (!combined.some((item) => item.title.toLowerCase() === sample.title.toLowerCase())) {
-              combined.push(sample);
+              const isSampleLead = user?.name
+                ? sample.members.some(
+                    (m) => m.role === "Project Lead" && m.name.toLowerCase() === user.name.toLowerCase()
+                  )
+                : false;
+              combined.push({
+                ...sample,
+                isLead: isSampleLead,
+                myRole: isSampleLead ? "Project Lead" : "Contributor",
+              });
             }
           });
           setProjects(combined);
+        } else {
+          const sampleWithLead = INITIAL_RUNNING_PROJECTS.map((sp) => {
+            const isSampleLead = user?.name
+              ? sp.members.some(
+                  (m) => m.role === "Project Lead" && m.name.toLowerCase() === user.name.toLowerCase()
+                )
+              : false;
+            return {
+              ...sp,
+              isLead: isSampleLead,
+              myRole: isSampleLead ? "Project Lead" : "Contributor",
+            };
+          });
+          setProjects(sampleWithLead);
         }
       } catch (err) {
         console.warn("MyProjects fetch error:", err);
+        const sampleWithLead = INITIAL_RUNNING_PROJECTS.map((sp) => {
+          const isSampleLead = user?.name
+            ? sp.members.some(
+                (m) => m.role === "Project Lead" && m.name.toLowerCase() === user.name.toLowerCase()
+              )
+            : false;
+          return {
+            ...sp,
+            isLead: isSampleLead,
+            myRole: isSampleLead ? "Project Lead" : "Contributor",
+          };
+        });
+        setProjects(sampleWithLead);
       }
     };
 
@@ -397,6 +436,56 @@ export default function MyProjectsScreen() {
         `The application has been cancelled and removed from the project.`
       );
     }
+  };
+
+  // Action 4: Remove Member from Project Team
+  const handleRemoveMember = (projectId: string, memberId: string, memberName: string) => {
+    Alert.alert(
+      "Remove Team Member",
+      `Are you sure you want to remove ${memberName} from this project?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Remove",
+          style: "destructive",
+          onPress: async () => {
+            const token = authStore.getToken();
+            if (token) {
+              try {
+                await ApiService.removeProjectMember(token, projectId, memberId);
+              } catch (e) {
+                console.warn("Remove member API error:", e);
+              }
+            }
+
+            setProjects((prev) =>
+              prev.map((p) => {
+                if (p.id === projectId) {
+                  return {
+                    ...p,
+                    members: p.members.filter((m) => m.id !== memberId),
+                  };
+                }
+                return p;
+              })
+            );
+
+            if (selectedProject?.id === projectId) {
+              setSelectedProject((prev) =>
+                prev
+                  ? {
+                      ...prev,
+                      members: prev.members.filter((m) => m.id !== memberId),
+                    }
+                  : null
+              );
+            }
+
+            Alert.alert("Member Removed", `${memberName} has been removed from the team.`);
+          },
+        },
+      ]
+    );
   };
 
   // Auth Guard: If not logged in, prompt user to sign in
@@ -589,6 +678,14 @@ export default function MyProjectsScreen() {
                           </Text>
                         </View>
                         <Text style={styles.memberPct}>{m.progressPct}%</Text>
+                        {p.isLead && m.role !== "Project Lead" && !m.role?.toLowerCase().includes("lead") && (
+                          <TouchableOpacity
+                            style={{ padding: 4, marginLeft: 4 }}
+                            onPress={() => handleRemoveMember(p.id, m.id, m.name)}
+                          >
+                            <Ionicons name="trash-outline" size={15} color="#EF4444" />
+                          </TouchableOpacity>
+                        )}
                       </View>
                       <View style={styles.miniProgressTrack}>
                         <View
@@ -773,7 +870,49 @@ export default function MyProjectsScreen() {
             </View>
 
             <ScrollView style={{ maxHeight: 380 }}>
-              <Text style={styles.subHeader}>Pending Applicants</Text>
+              {/* Active Team Members */}
+              <Text style={styles.subHeader}>
+                Active Team Members ({selectedProject?.members?.length || 0})
+              </Text>
+              {selectedProject?.members && selectedProject.members.length > 0 ? (
+                selectedProject.members.map((m) => {
+                  const isLeadRole =
+                    m.role === "Project Lead" || m.role?.toLowerCase().includes("lead");
+                  return (
+                    <View key={m.id} style={styles.applicantCard}>
+                      <View style={[styles.applicantTop, { marginBottom: 0 }]}>
+                        <View style={styles.applicantAvatar}>
+                          <Text style={styles.applicantAvatarText}>{m.initials}</Text>
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.applicantName}>{m.name}</Text>
+                          <Text style={styles.applicantRole}>{m.role}</Text>
+                        </View>
+                        {isLeadRole ? (
+                          <View style={styles.leadBadge}>
+                            <Text style={styles.leadBadgeText}>Leader</Text>
+                          </View>
+                        ) : selectedProject?.isLead ? (
+                          <TouchableOpacity
+                            style={styles.removeMemberBtn}
+                            onPress={() => handleRemoveMember(selectedProject.id, m.id, m.name)}
+                          >
+                            <Ionicons name="trash-outline" size={14} color="#EF4444" />
+                            <Text style={styles.removeMemberBtnText}>Remove</Text>
+                          </TouchableOpacity>
+                        ) : null}
+                      </View>
+                    </View>
+                  );
+                })
+              ) : (
+                <Text style={styles.emptyText}>No members in this project.</Text>
+              )}
+
+              {/* Pending Applicants */}
+              <Text style={[styles.subHeader, { marginTop: 16 }]}>
+                Pending Applicants ({selectedProject?.applicants?.length || 0})
+              </Text>
               {selectedProject?.applicants && selectedProject.applicants.length > 0 ? (
                 selectedProject.applicants.map((a) => (
                   <View key={a.id} style={styles.applicantCard}>
@@ -1411,6 +1550,31 @@ const styles = StyleSheet.create({
     color: THEME.textMuted,
     textAlign: "center",
     paddingVertical: 20,
+  },
+  leadBadge: {
+    backgroundColor: THEME.pastelViolet,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  leadBadgeText: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: THEME.accentViolet,
+  },
+  removeMemberBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "#FEE2E2",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+  },
+  removeMemberBtnText: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#EF4444",
   },
 });
 

@@ -71,24 +71,81 @@ const seedData = async () => {
 
     console.log(`Created ${users.length} sample users.`);
 
-    // Seed Project
-    const project = await Project.create({
-      title: "AI-Powered Smart Campus Navigation",
-      description: "Building a React Native cross-platform indoor routing mobile application with graph pathfinding.",
-      category: "Mobile & AI",
-      difficulty: "Advanced",
-      requiredSkills: ["React Native", "TypeScript", "Node.js", "Python"],
-      maxTeamSize: 4,
-      leader: users[2]._id,
-      deadline: "Dec 15, 2026",
-      status: "Recruiting",
-    });
+    // Seed Projects
+    const projects = await Project.create([
+      {
+        title: "AI-Powered Smart Campus Navigation",
+        description: "Building a React Native cross-platform indoor routing mobile application with graph pathfinding.",
+        category: "Mobile & AI",
+        difficulty: "Advanced",
+        requiredSkills: ["React Native", "TypeScript", "Node.js", "Python"],
+        maxTeamSize: 4,
+        leader: users[2]._id,
+        deadline: "Dec 15, 2026",
+        status: "Recruiting",
+      },
+      {
+        title: "Blockchain Credential & Degree Verification",
+        description: "A secure verification platform for university transcripts and certificate validation with cryptographic signing.",
+        category: "Full Stack & Cloud",
+        difficulty: "Intermediate",
+        requiredSkills: ["Java", "Spring Boot", "PostgreSQL", "Docker"],
+        maxTeamSize: 5,
+        leader: users[0]._id,
+        deadline: "Nov 30, 2026",
+        status: "Recruiting",
+      },
+      {
+        title: "Healthcare Telemedicine & Doctor Booking",
+        description: "Clean tele-consultation scheduling system with real-time video, prescription generation, and pharmacy integration.",
+        category: "UI/UX & Web",
+        difficulty: "Intermediate",
+        requiredSkills: ["UI/UX", "Figma", "React", "MongoDB"],
+        maxTeamSize: 3,
+        leader: users[1]._id,
+        deadline: "Jan 10, 2027",
+        status: "Recruiting",
+      },
+      {
+        title: "Automated Crop Disease Diagnostic App",
+        description: "Mobile image diagnostic tool allowing farmers to snap leaf photographs and detect fungal diseases with 95% accuracy.",
+        category: "Machine Learning",
+        difficulty: "Advanced",
+        requiredSkills: ["Python", "PyTorch", "FastAPI", "React Native"],
+        maxTeamSize: 3,
+        leader: users[2]._id,
+        deadline: "Dec 20, 2026",
+        status: "Recruiting",
+      },
+    ]);
 
-    console.log(`Created sample project: ${project.title}`);
+    console.log(`Created ${projects.length} sample projects.`);
+
+    // Seed Sample Applications
+    const Application = require("./models/Application");
+    await Application.deleteMany();
+    await Application.create([
+      {
+        project: projects[0]._id,
+        applicant: users[1]._id, // David Chen
+        inviter: users[2]._id,
+        type: "Application",
+        coverNote: "I have 2 years of React Native & UI experience. I'd love to join!",
+        status: "Pending",
+      },
+      {
+        project: projects[1]._id,
+        applicant: users[1]._id, // David Chen
+        inviter: users[0]._id,
+        type: "Invitation",
+        coverNote: "Sarah invited you to design the UI for Blockchain Degree Verification.",
+        status: "Pending",
+      },
+    ]);
 
     // Seed Task
     await Task.create({
-      project: project._id,
+      project: projects[0]._id,
       title: "Implement JWT Authentication & User Roles",
       description: "Setup bcrypt password hashing and token generation in Express.",
       assignee: users[0]._id,

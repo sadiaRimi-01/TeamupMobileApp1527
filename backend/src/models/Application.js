@@ -12,6 +12,15 @@ const applicationSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
+    inviter: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+    type: {
+      type: String,
+      enum: ["Application", "Invitation"],
+      default: "Application",
+    },
     coverNote: {
       type: String,
       trim: true,
@@ -31,7 +40,7 @@ const applicationSchema = new mongoose.Schema(
   }
 );
 
-// Prevent duplicate applications for the same project
+// Prevent duplicate applications/invitations for the same project and applicant
 applicationSchema.index({ project: 1, applicant: 1 }, { unique: true });
 
 module.exports = mongoose.model("Application", applicationSchema);

@@ -13,37 +13,22 @@ const projectSchema = new mongoose.Schema(
     },
     category: {
       type: String,
-      required: [true, "Project category is required"],
-      enum: [
-        "Mobile & AI",
-        "Full Stack & Cloud",
-        "UI/UX & Web",
-        "Machine Learning",
-        "IoT & Embedded",
-        "Other",
-      ],
       default: "Full Stack & Cloud",
+      trim: true,
     },
     difficulty: {
       type: String,
-      enum: ["Beginner", "Intermediate", "Advanced"],
       default: "Intermediate",
     },
     requiredSkills: {
       type: [String],
-      required: true,
-      validate: {
-        validator: function (v) {
-          return Array.isArray(v) && v.length > 0;
-        },
-        message: "At least one required skill is required",
-      },
+      default: ["React Native", "TypeScript"],
     },
     maxTeamSize: {
       type: Number,
       default: 4,
-      min: 2,
-      max: 10,
+      min: 1,
+      max: 50,
     },
     leader: {
       type: mongoose.Schema.Types.ObjectId,

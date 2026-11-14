@@ -10,29 +10,37 @@ exports.createProject = async (req, res) => {
     if (typeof requiredSkills === "string") {
       requiredSkills = requiredSkills.split(",").map((s) => s.trim()).filter(Boolean);
     }
+    if (!Array.isArray(requiredSkills) || requiredSkills.length === 0) {
+      requiredSkills = ["React Native", "TypeScript"];
+    }
 
-    if (!title || !description || !requiredSkills || requiredSkills.length === 0) {
+    if (!title || !description) {
       return res.status(400).json({
         success: false,
-        message: "Please provide title, description, and at least one required skill.",
+        message: "Please provide title and description.",
       });
     }
 
+    const leaderId = req.user ? (req.user._id || req.user.id) : null;
+
     const project = await Project.create({
-      title,
-      description,
+      title: title.trim(),
+      description: description.trim(),
       category: category || "Full Stack & Cloud",
       difficulty: difficulty || "Intermediate",
       requiredSkills,
-      maxTeamSize: maxTeamSize || 4,
+      maxTeamSize: Math.max(1, parseInt(maxTeamSize, 10) || 4),
       deadline: deadline || "TBD",
       githubRepo: githubRepo || "",
-      leader: req.user.id,
+      leader: leaderId,
     });
+
+    const populatedProject = await Project.findById(project._id)
+      .populate("leader", "name email university avatarInitials rating");
 
     res.status(201).json({
       success: true,
-      project,
+      project: populatedProject || project,
     });
   } catch (error) {
     res.status(500).json({

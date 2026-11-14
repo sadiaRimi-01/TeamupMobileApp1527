@@ -1,4 +1,5 @@
 const User = require("../models/User");
+const bcrypt = require("bcryptjs");
 
 // @desc    Register a new user
 // @route   POST /api/auth/register
@@ -145,25 +146,77 @@ exports.getMe = async (req, res) => {
 // @access  Private
 exports.updateProfile = async (req, res) => {
   try {
-    const { name, bio, university, skills, githubUrl, portfolioUrl, isAvailable } = req.body;
+    let { name, email, password, bio, university, skills, githubUrl, portfolioUrl, isAvailable } = req.body;
 
-    const fieldsToUpdate = {};
-    if (name) fieldsToUpdate.name = name;
-    if (bio !== undefined) fieldsToUpdate.bio = bio;
-    if (university) fieldsToUpdate.university = university;
-    if (skills) fieldsToUpdate.skills = skills;
-    if (githubUrl !== undefined) fieldsToUpdate.githubUrl = githubUrl;
-    if (portfolioUrl !== undefined) fieldsToUpdate.portfolioUrl = portfolioUrl;
-    if (isAvailable !== undefined) fieldsToUpdate.isAvailable = isAvailable;
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
 
-    const user = await User.findByIdAndUpdate(req.user.id, fieldsToUpdate, {
-      new: true,
-      runValidators: true,
-    });
+    if (email && email.trim() !== user.email) {
+      const emailExists = await User.findOne({
+        email: email.trim().toLowerCase(),
+        _id: { $ne: user._id },
+      });
+      if (emailExists) {
+        return res.status(400).json({
+          success: false,
+          message: "An account with this email already exists",
+        });
+      }
+      user.email = email.trim().toLowerCase();
+    }
+
+    if (name && name.trim()) {
+      user.name = name.trim();
+      const words = user.name.split(" ");
+      user.avatarInitials =
+        words.length > 1
+          ? (words[0][0] + words[1][0]).toUpperCase()
+          : user.name.substring(0, 2).toUpperCase();
+    }
+
+    if (university !== undefined) {
+      user.university = university.trim();
+    }
+
+    if (skills !== undefined) {
+      if (typeof skills === "string") {
+        user.skills = skills.split(",").map((s) => s.trim()).filter(Boolean);
+      } else if (Array.isArray(skills)) {
+        user.skills = skills;
+      }
+    }
+
+    if (bio !== undefined) user.bio = bio;
+    if (githubUrl !== undefined) user.githubUrl = githubUrl;
+    if (portfolioUrl !== undefined) user.portfolioUrl = portfolioUrl;
+    if (isAvailable !== undefined) user.isAvailable = isAvailable;
+
+    if (password && password.trim().length >= 6) {
+      const salt = await bcrypt.genSalt(10);
+      user.password = await bcrypt.hash(password.trim(), salt);
+    }
+
+    await user.save();
 
     res.status(200).json({
       success: true,
-      user,
+      message: "Profile updated successfully in MongoDB",
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        university: user.university,
+        skills: user.skills,
+        bio: user.bio,
+        rating: user.rating,
+        avatarInitials: user.avatarInitials,
+      },
     });
   } catch (error) {
     res.status(500).json({

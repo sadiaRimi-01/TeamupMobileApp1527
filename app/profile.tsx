@@ -8,12 +8,16 @@ import {
   Alert,
   Platform,
   StatusBar,
+  Modal,
+  TextInput,
+  ActivityIndicator,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { THEME } from "../src/constants/theme";
 import { authStore, AuthUser } from "../src/services/authStore";
+import { ApiService } from "../src/services/api";
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
@@ -23,7 +27,18 @@ export default function ProfileScreen() {
   );
 
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(authStore.getUser());
-  const [activeTab, setActiveTab] = useState<"skills" | "projects" | "reviews">("skills");
+  const [activeTab, setActiveTab] = useState<"skills" | "invitations" | "projects" | "reviews">("skills");
+  const [invitations, setInvitations] = useState<any[]>([]);
+  const [loadingInvites, setLoadingInvites] = useState(false);
+
+  // Edit Profile Modal state
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editEmail, setEditEmail] = useState("");
+  const [editPassword, setEditPassword] = useState("");
+  const [editUniversity, setEditUniversity] = useState("");
+  const [editSkills, setEditSkills] = useState("");
+  const [savingProfile, setSavingProfile] = useState(false);
 
   useEffect(() => {
     setCurrentUser(authStore.getUser());
@@ -32,6 +47,107 @@ export default function ProfileScreen() {
     });
     return unsub;
   }, []);
+
+  const fetchInvitations = async () => {
+    const token = authStore.getToken();
+    if (!token) return;
+    setLoadingInvites(true);
+    try {
+      const res = await ApiService.getMyInvitations(token);
+      if (res && res.success && Array.isArray(res.invitations)) {
+        setInvitations(res.invitations.filter((i: any) => i.status === "Pending"));
+      }
+    } catch {
+      // Fallback
+    } finally {
+      setLoadingInvites(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchInvitations();
+  }, [currentUser]);
+
+  const openEditModal = () => {
+    if (currentUser) {
+      setEditName(currentUser.name || "");
+      setEditEmail(currentUser.email || "");
+      setEditPassword("");
+      setEditUniversity(currentUser.university || "BUET");
+      setEditSkills(
+        Array.isArray(currentUser.skills) ? currentUser.skills.join(", ") : ""
+      );
+    }
+    setIsEditModalOpen(true);
+  };
+
+  const handleSaveProfile = async () => {
+    if (!editName.trim() || !editEmail.trim()) {
+      Alert.alert("Missing Fields", "Name and email are required.");
+      return;
+    }
+
+    setSavingProfile(true);
+    try {
+      const token = authStore.getToken();
+      if (!token) {
+        Alert.alert("Error", "Please sign in to update your profile.");
+        return;
+      }
+
+      const skillsArray = editSkills.split(",").map((s) => s.trim()).filter(Boolean);
+
+      const res = await ApiService.updateProfile(token, {
+        name: editName.trim(),
+        email: editEmail.trim(),
+        password: editPassword.trim() || undefined,
+        university: editUniversity.trim(),
+        skills: skillsArray,
+      });
+
+      if (res && res.success && res.user) {
+        authStore.setSession(token, {
+          ...currentUser!,
+          name: res.user.name,
+          email: res.user.email,
+          university: res.user.university,
+          skills: res.user.skills,
+          avatarInitials: res.user.avatarInitials,
+        });
+        setCurrentUser(authStore.getUser());
+        setIsEditModalOpen(false);
+        Alert.alert(
+          "Profile Updated! ✅",
+          "Your profile details have been saved in MongoDB and updated in the app."
+        );
+      } else {
+        Alert.alert("Update Failed", res.message || "Failed to update profile in database.");
+      }
+    } catch (err: any) {
+      Alert.alert("Error", err.message || "Network request failed.");
+    } finally {
+      setSavingProfile(false);
+    }
+  };
+
+  const handleInvitationAction = async (inviteId: string, action: "accept" | "decline") => {
+    const token = authStore.getToken();
+    if (!token) return;
+
+    try {
+      if (action === "accept") {
+        await ApiService.updateApplicationStatus(token, inviteId, "Accepted");
+        setInvitations((prev) => prev.filter((i) => i._id !== inviteId));
+        Alert.alert("Invitation Accepted! 🎉", "You are now a team member of this project!");
+      } else {
+        await ApiService.deleteApplication(token, inviteId);
+        setInvitations((prev) => prev.filter((i) => i._id !== inviteId));
+        Alert.alert("Invitation Cancelled", "The team invitation has been declined.");
+      }
+    } catch {
+      Alert.alert("Notice", "Updated invitation status.");
+    }
+  };
 
   const handleSignOut = () => {
     authStore.clearSession();
@@ -121,7 +237,7 @@ export default function ProfileScreen() {
         <Text style={styles.headerTitle}>Professional Profile</Text>
         <TouchableOpacity
           style={styles.backBtn}
-          onPress={() => Alert.alert("Edit Profile", "Update your skills, bio and portfolio links.")}
+          onPress={openEditModal}
         >
           <Ionicons name="create-outline" size={20} color={THEME.inkDark} />
         </TouchableOpacity>
@@ -234,6 +350,13 @@ export default function ProfileScreen() {
         <View style={styles.tabsRow}>
           {[
             { key: "skills", label: "Skills & Tech" },
+            {
+              key: "invitations",
+              label:
+                invitations.length > 0
+                  ? `Invitations (${invitations.length})`
+                  : "Invitations",
+            },
             { key: "projects", label: "Projects (3)" },
             { key: "reviews", label: "Peer Reviews (14)" },
           ].map((tab) => {
@@ -339,7 +462,160 @@ export default function ProfileScreen() {
             ))}
           </View>
         )}
+
+        {/* Tab Content: Invitations */}
+        {activeTab === "invitations" && (
+          <View style={styles.invitationsTabContent}>
+            {loadingInvites ? (
+              <ActivityIndicator size="small" color={THEME.primary} style={{ marginVertical: 20 }} />
+            ) : invitations.length > 0 ? (
+              invitations.map((inv) => (
+                <View key={inv._id} style={styles.inviteCard}>
+                  <View style={styles.inviteTop}>
+                    <View style={styles.inviteIconCircle}>
+                      <Ionicons name="mail-unread-outline" size={20} color={THEME.primary} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.inviteProjTitle}>{inv.project?.title || "Team Collaboration"}</Text>
+                      <Text style={styles.inviteCategory}>{inv.project?.category || "Project"}</Text>
+                    </View>
+                    <View style={styles.pendingBadge}>
+                      <Text style={styles.pendingBadgeText}>Pending</Text>
+                    </View>
+                  </View>
+
+                  <Text style={styles.inviteNote}>
+                    {inv.coverNote || "You have been invited to join this project team."}
+                  </Text>
+
+                  {inv.inviter?.name && (
+                    <Text style={styles.inviterText}>
+                      Invited by: <Text style={{ fontWeight: "800", color: THEME.inkDark }}>{inv.inviter.name}</Text>
+                    </Text>
+                  )}
+
+                  <View style={styles.inviteActionRow}>
+                    <TouchableOpacity
+                      style={styles.acceptInviteBtn}
+                      onPress={() => handleInvitationAction(inv._id, "accept")}
+                    >
+                      <Ionicons name="checkmark-circle-outline" size={16} color={THEME.white} />
+                      <Text style={styles.acceptInviteBtnText}>Accept & Join</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={styles.declineInviteBtn}
+                      onPress={() => handleInvitationAction(inv._id, "decline")}
+                    >
+                      <Ionicons name="close-circle-outline" size={16} color="#EF4444" />
+                      <Text style={styles.declineInviteBtnText}>Decline</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))
+            ) : (
+              <View style={styles.emptyInviteBox}>
+                <Ionicons name="mail-open-outline" size={40} color={THEME.textMuted} />
+                <Text style={styles.emptyInviteTitle}>No Pending Invitations</Text>
+                <Text style={styles.emptyInviteSub}>
+                  When a project leader invites you to their team, it will appear here with options to Accept or Decline.
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
       </ScrollView>
+
+      {/* Edit Profile Modal */}
+      <Modal
+        visible={isEditModalOpen}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setIsEditModalOpen(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Edit Profile</Text>
+              <TouchableOpacity onPress={() => setIsEditModalOpen(false)}>
+                <Ionicons name="close" size={24} color={THEME.inkDark} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={{ maxHeight: 420 }} showsVerticalScrollIndicator={false}>
+              <View style={styles.fieldGroup}>
+                <Text style={styles.fieldLabel}>Full Name</Text>
+                <TextInput
+                  style={styles.fieldInput}
+                  value={editName}
+                  onChangeText={setEditName}
+                  placeholder="Your full name"
+                  placeholderTextColor={THEME.textMuted}
+                />
+              </View>
+
+              <View style={styles.fieldGroup}>
+                <Text style={styles.fieldLabel}>Email Address</Text>
+                <TextInput
+                  style={styles.fieldInput}
+                  value={editEmail}
+                  onChangeText={setEditEmail}
+                  placeholder="your.email@university.edu"
+                  placeholderTextColor={THEME.textMuted}
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                />
+              </View>
+
+              <View style={styles.fieldGroup}>
+                <Text style={styles.fieldLabel}>Password (Leave blank to keep current)</Text>
+                <TextInput
+                  style={styles.fieldInput}
+                  value={editPassword}
+                  onChangeText={setEditPassword}
+                  placeholder="Enter new password"
+                  placeholderTextColor={THEME.textMuted}
+                  secureTextEntry
+                />
+              </View>
+
+              <View style={styles.fieldGroup}>
+                <Text style={styles.fieldLabel}>University / Institution</Text>
+                <TextInput
+                  style={styles.fieldInput}
+                  value={editUniversity}
+                  onChangeText={setEditUniversity}
+                  placeholder="e.g. BUET, DU, NSU"
+                  placeholderTextColor={THEME.textMuted}
+                />
+              </View>
+
+              <View style={styles.fieldGroup}>
+                <Text style={styles.fieldLabel}>Skills (Comma-separated)</Text>
+                <TextInput
+                  style={styles.fieldInput}
+                  value={editSkills}
+                  onChangeText={setEditSkills}
+                  placeholder="e.g. Java, React Native, Python, UI/UX"
+                  placeholderTextColor={THEME.textMuted}
+                />
+              </View>
+            </ScrollView>
+
+            <TouchableOpacity
+              style={[styles.saveProfileBtn, savingProfile && { opacity: 0.7 }]}
+              onPress={handleSaveProfile}
+              disabled={savingProfile}
+            >
+              {savingProfile ? (
+                <ActivityIndicator color={THEME.white} />
+              ) : (
+                <Text style={styles.saveProfileBtnText}>Save Changes to MongoDB</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -758,6 +1034,183 @@ const styles = StyleSheet.create({
   },
   guardSecondaryBtnText: {
     color: THEME.primary,
+    fontWeight: "800",
+    fontSize: 14,
+  },
+
+  // Invitations Tab Styles
+  invitationsTabContent: {
+    gap: 12,
+  },
+  inviteCard: {
+    backgroundColor: THEME.white,
+    borderRadius: 18,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: THEME.cardBorder,
+    shadowColor: THEME.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  inviteTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 8,
+  },
+  inviteIconCircle: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: "#EEF2FF",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  inviteProjTitle: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: THEME.inkDark,
+  },
+  inviteCategory: {
+    fontSize: 11,
+    color: THEME.secondary,
+    fontWeight: "700",
+  },
+  pendingBadge: {
+    backgroundColor: "#FEF3C7",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  pendingBadgeText: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#D97706",
+  },
+  inviteNote: {
+    fontSize: 12,
+    lineHeight: 18,
+    color: THEME.textSecondary,
+    marginBottom: 8,
+  },
+  inviterText: {
+    fontSize: 12,
+    color: THEME.textMuted,
+    marginBottom: 12,
+  },
+  inviteActionRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  acceptInviteBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: THEME.primary,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  acceptInviteBtnText: {
+    color: THEME.white,
+    fontWeight: "800",
+    fontSize: 13,
+  },
+  declineInviteBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: "#FEE2E2",
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  declineInviteBtnText: {
+    color: "#EF4444",
+    fontWeight: "800",
+    fontSize: 13,
+  },
+  emptyInviteBox: {
+    backgroundColor: THEME.white,
+    borderRadius: 18,
+    padding: 24,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: THEME.cardBorder,
+  },
+  emptyInviteTitle: {
+    fontSize: 16,
+    fontWeight: "900",
+    color: THEME.inkDark,
+    marginTop: 10,
+    marginBottom: 6,
+  },
+  emptyInviteSub: {
+    fontSize: 12,
+    color: THEME.textMuted,
+    textAlign: "center",
+    lineHeight: 18,
+  },
+
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(13, 12, 34, 0.6)",
+    justifyContent: "center",
+    padding: 20,
+  },
+  modalCard: {
+    backgroundColor: THEME.white,
+    borderRadius: 24,
+    padding: 20,
+    maxHeight: "85%",
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: THEME.cardBorderSubtle,
+    paddingBottom: 12,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "900",
+    color: THEME.inkDark,
+  },
+  fieldGroup: {
+    marginBottom: 14,
+  },
+  fieldLabel: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: THEME.inkDark,
+    marginBottom: 6,
+  },
+  fieldInput: {
+    backgroundColor: THEME.canvasLight,
+    borderWidth: 1,
+    borderColor: THEME.cardBorder,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: THEME.inkDark,
+  },
+  saveProfileBtn: {
+    backgroundColor: THEME.primary,
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: "center",
+    marginTop: 12,
+  },
+  saveProfileBtnText: {
+    color: THEME.white,
     fontWeight: "800",
     fontSize: 14,
   },

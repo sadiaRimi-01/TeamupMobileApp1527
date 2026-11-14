@@ -17,6 +17,7 @@ export interface ApiResponse<T = any> {
   tasks?: any[];
   application?: any;
   applications?: any[];
+  invitations?: any[];
   users?: any[];
   candidates?: any[];
   reviews?: any[];
@@ -83,6 +84,29 @@ export const ApiService = {
     }
   },
 
+  updateProfile: async (token: string, profileData: {
+    name?: string;
+    email?: string;
+    password?: string;
+    university?: string;
+    skills?: string[] | string;
+    bio?: string;
+  }): Promise<ApiResponse> => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/auth/profile`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(profileData),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, message: err.message || "Failed to update profile" };
+    }
+  },
+
   getAllUsers: async (search?: string): Promise<ApiResponse> => {
     try {
       let query = "";
@@ -145,8 +169,14 @@ export const ApiService = {
     }
   },
 
-  // Project Applications
-  applyToProject: async (token: string, projectId: string, coverNote?: string): Promise<ApiResponse> => {
+  // Project Applications & Invitations
+  applyToProject: async (
+    token: string,
+    projectId: string,
+    coverNote?: string,
+    candidateId?: string,
+    type?: "Application" | "Invitation"
+  ): Promise<ApiResponse> => {
     try {
       const res = await fetch(`${API_BASE_URL}/applications/${projectId}`, {
         method: "POST",
@@ -154,11 +184,75 @@ export const ApiService = {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ coverNote }),
+        body: JSON.stringify({ coverNote, candidateId, type }),
       });
       return await res.json();
     } catch (err: any) {
       return { success: false, message: err.message || "Application failed" };
+    }
+  },
+
+  getProjectApplications: async (token: string, projectId: string): Promise<ApiResponse> => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/applications/project/${projectId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, message: err.message };
+    }
+  },
+
+  getMyInvitations: async (token: string): Promise<ApiResponse> => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/applications/my-invitations`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, message: err.message };
+    }
+  },
+
+  updateApplicationStatus: async (
+    token: string,
+    applicationId: string,
+    status: "Accepted" | "Rejected",
+    roleName?: string
+  ): Promise<ApiResponse> => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/applications/${applicationId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ status, roleName }),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, message: err.message || "Failed to update status" };
+    }
+  },
+
+  deleteApplication: async (token: string, applicationId: string): Promise<ApiResponse> => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/applications/${applicationId}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, message: err.message || "Failed to delete application" };
     }
   },
 

@@ -18,9 +18,10 @@ app.use(express.json());
 app.use(cors());
 
 // Health Check Route
-app.get("/", (req, res) => {
+app.get(["/", "/health", "/api/health"], (req, res) => {
   res.json({
     status: "online",
+    online: true,
     message: "🚀 TeamUp Backend REST API is running...",
     timestamp: new Date().toISOString(),
   });

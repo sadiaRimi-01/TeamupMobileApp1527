@@ -174,6 +174,92 @@ export default function MyProjectsScreen() {
     return unsub;
   }, []);
 
+  useEffect(() => {
+    const fetchLiveProjectsAndApplications = async () => {
+      try {
+        const res = await ApiService.getProjects();
+        if (res && res.success && Array.isArray(res.projects) && res.projects.length > 0) {
+          const liveProjects: RunningProject[] = res.projects.map((p: any, idx: number) => {
+            const isUserLead = user?.name
+              ? p.leader?.name?.toLowerCase().includes(user.name.toLowerCase())
+              : true;
+
+            const mappedMembers: TeamMemberProgress[] = [
+              {
+                id: p.leader?._id || `lead_${idx}`,
+                name: p.leader?.name || "Project Leader",
+                role: "Project Lead",
+                initials: p.leader?.avatarInitials || "PL",
+                progressPct: 80,
+              },
+              ...(p.members || []).map((m: any, mIdx: number) => ({
+                id: m.user?._id || `m_${idx}_${mIdx}`,
+                name: m.user?.name || m.roleName || "Team Member",
+                role: m.roleName || "Contributor",
+                initials: m.user?.avatarInitials || "TM",
+                progressPct: 50,
+              })),
+            ];
+
+            return {
+              id: p._id || `proj_${idx}`,
+              title: p.title,
+              category: p.category || "Development",
+              description: p.description,
+              myRole: isUserLead ? "Project Lead" : "Team Member",
+              isLead: isUserLead,
+              status: p.status === "Completed" ? "Completed" : "Active",
+              progressPct: 65,
+              nextMilestone: `Sprint deliverables due ${p.deadline || "Next week"}`,
+              skills: Array.isArray(p.requiredSkills) ? p.requiredSkills : ["React Native"],
+              members: mappedMembers,
+              milestones: [
+                { id: "m1", title: "API and schema definitions", dueDate: "Week 1", done: true },
+                { id: "m2", title: "Frontend mobile views and navigation", dueDate: "Week 2", done: true },
+                { id: "m3", title: "Testing, verification and final deployment", dueDate: p.deadline || "Dec 15", done: false },
+              ],
+              applicants: [],
+            };
+          });
+
+          // Fetch applications for these projects
+          const token = authStore.getToken();
+          if (token) {
+            for (const lp of liveProjects) {
+              try {
+                const appRes = await ApiService.getProjectApplications(token, lp.id);
+                if (appRes && appRes.success && Array.isArray(appRes.applications)) {
+                  lp.applicants = appRes.applications
+                    .filter((a: any) => a.status === "Pending")
+                    .map((a: any) => ({
+                      id: a._id,
+                      name: a.applicant?.name || "Applicant",
+                      role: a.applicant?.role || "Developer",
+                      initials: a.applicant?.avatarInitials || "AP",
+                      matchPct: "92%",
+                      status: "pending",
+                    }));
+                }
+              } catch {}
+            }
+          }
+
+          const combined = [...liveProjects];
+          INITIAL_RUNNING_PROJECTS.forEach((sample) => {
+            if (!combined.some((item) => item.title.toLowerCase() === sample.title.toLowerCase())) {
+              combined.push(sample);
+            }
+          });
+          setProjects(combined);
+        }
+      } catch (err) {
+        console.warn("MyProjects fetch error:", err);
+      }
+    };
+
+    fetchLiveProjectsAndApplications();
+  }, [user]);
+
   // Filter projects by active tab
   const filteredProjects = projects.filter((p) => {
     if (activeTab === "lead") return p.isLead;
@@ -234,33 +320,83 @@ export default function MyProjectsScreen() {
   };
 
   // Action 3: Accept / Decline Applicant
-  const handleApplicantDecision = (applicantId: string, decision: "accepted" | "declined") => {
+  const handleApplicantDecision = async (applicantId: string, decision: "accepted" | "declined") => {
     if (!selectedProject) return;
 
-    setProjects((prev) =>
-      prev.map((p) => {
-        if (p.id === selectedProject.id) {
-          const updatedApps = p.applicants.map((a) =>
-            a.id === applicantId ? { ...a, status: decision } : a
-          );
-          return { ...p, applicants: updatedApps };
-        }
-        return p;
-      })
-    );
+    const applicantObj = selectedProject.applicants.find((a) => a.id === applicantId);
+    const token = authStore.getToken();
 
-    setSelectedProject((prev) => {
-      if (!prev) return null;
-      const updatedApps = prev.applicants.map((a) =>
-        a.id === applicantId ? { ...a, status: decision } : a
+    if (token) {
+      try {
+        await ApiService.updateApplicationStatus(
+          token,
+          applicantId,
+          decision === "accepted" ? "Accepted" : "Rejected"
+        );
+      } catch (e) {
+        console.warn("Status update warning:", e);
+      }
+    }
+
+    if (decision === "accepted" && applicantObj) {
+      const newMember: TeamMemberProgress = {
+        id: applicantObj.id,
+        name: applicantObj.name,
+        role: applicantObj.role || "Team Member",
+        initials: applicantObj.initials || applicantObj.name.substring(0, 2).toUpperCase(),
+        progressPct: 25,
+      };
+
+      setProjects((prev) =>
+        prev.map((p) => {
+          if (p.id === selectedProject.id) {
+            const alreadyMember = p.members.some(
+              (m) => m.name.toLowerCase() === applicantObj.name.toLowerCase()
+            );
+            const updatedMembers = alreadyMember ? p.members : [...p.members, newMember];
+            const updatedApps = p.applicants.filter((a) => a.id !== applicantId);
+            return { ...p, members: updatedMembers, applicants: updatedApps };
+          }
+          return p;
+        })
       );
-      return { ...prev, applicants: updatedApps };
-    });
 
-    Alert.alert(
-      decision === "accepted" ? "Member Accepted! 🎉" : "Application Declined",
-      `The candidate's status has been updated in the project team.`
-    );
+      setSelectedProject((prev) => {
+        if (!prev) return null;
+        const alreadyMember = prev.members.some(
+          (m) => m.name.toLowerCase() === applicantObj.name.toLowerCase()
+        );
+        const updatedMembers = alreadyMember ? prev.members : [...prev.members, newMember];
+        const updatedApps = prev.applicants.filter((a) => a.id !== applicantId);
+        return { ...prev, members: updatedMembers, applicants: updatedApps };
+      });
+
+      Alert.alert(
+        "Member Accepted! 🎉",
+        `${applicantObj.name} has been added to "${selectedProject.title}" as an active team member.`
+      );
+    } else {
+      setProjects((prev) =>
+        prev.map((p) => {
+          if (p.id === selectedProject.id) {
+            const updatedApps = p.applicants.filter((a) => a.id !== applicantId);
+            return { ...p, applicants: updatedApps };
+          }
+          return p;
+        })
+      );
+
+      setSelectedProject((prev) => {
+        if (!prev) return null;
+        const updatedApps = prev.applicants.filter((a) => a.id !== applicantId);
+        return { ...prev, applicants: updatedApps };
+      });
+
+      Alert.alert(
+        "Application Cancelled",
+        `The application has been cancelled and removed from the project.`
+      );
+    }
   };
 
   // Auth Guard: If not logged in, prompt user to sign in

@@ -120,7 +120,7 @@ export default function ProjectsScreen() {
         search.trim() || undefined
       );
 
-      if (res && res.success && Array.isArray(res.projects) && res.projects.length > 0) {
+      if (res && res.success && Array.isArray(res.projects)) {
         const mapped: ProjectItem[] = res.projects.map((p: any) => ({
           id: p._id || p.id,
           title: p.title,
@@ -133,7 +133,6 @@ export default function ProjectsScreen() {
           status: p.status || "Recruiting",
         }));
 
-        // Merge with samples if less than 3
         const combined = [...mapped];
         SAMPLE_PROJECTS.forEach((sample) => {
           if (!combined.some((item) => item.title.toLowerCase() === sample.title.toLowerCase())) {
@@ -172,7 +171,15 @@ export default function ProjectsScreen() {
     }
 
     if (token) {
-      await ApiService.applyToProject(token, id, "I would love to contribute my technical skills.");
+      const applyRes = await ApiService.applyToProject(token, id, "I would love to contribute my technical skills.");
+      if (applyRes && applyRes.success) {
+        setAppliedProjects((prev) => ({ ...prev, [id]: true }));
+        Alert.alert(
+          "Application Submitted! 🚀",
+          `Your application to join "${title}" has been saved in MongoDB and sent to the Project Leader.`
+        );
+        return;
+      }
     }
 
     setAppliedProjects((prev) => ({ ...prev, [id]: true }));
@@ -223,12 +230,12 @@ export default function ProjectsScreen() {
         const newProjItem: ProjectItem = {
           id: res.project._id || `p_${Date.now()}`,
           title: res.project.title,
-          category: res.project.category,
+          category: res.project.category || newCategory,
           desc: res.project.description,
-          requiredSkills: res.project.requiredSkills,
-          members: `1 / ${res.project.maxTeamSize} Members`,
-          leader: authStore.getUser()?.name || "Sarah Lin",
-          deadline: res.project.deadline,
+          requiredSkills: res.project.requiredSkills || skillsList,
+          members: `1 / ${res.project.maxTeamSize || 4} Members`,
+          leader: res.project.leader?.name || authStore.getUser()?.name || "Project Leader",
+          deadline: res.project.deadline || newDeadline,
           status: "Recruiting",
         };
 
@@ -242,6 +249,8 @@ export default function ProjectsScreen() {
           "Project Created! 🚀",
           "Your new project is successfully saved in MongoDB! Refresh MongoDB Compass to see it in the 'projects' collection."
         );
+
+        fetchLiveProjects();
       } else {
         Alert.alert("Error", res.message || "Failed to create project in backend.");
       }

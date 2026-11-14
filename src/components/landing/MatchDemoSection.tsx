@@ -46,7 +46,9 @@ export default function MatchDemoSection() {
           await ApiService.applyToProject(
             token,
             firstProjId,
-            `Smart Match Engine invitation sent to ${candidateName}`
+            `Smart Match Engine invitation sent to ${candidateName}`,
+            candidateName,
+            "Invitation"
           );
         }
       } catch (err) {

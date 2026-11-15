@@ -123,15 +123,18 @@ exports.getMyInvitations = async (req, res) => {
     let orConditions = [{ applicant: req.user.id }];
 
     if (user) {
-      const matchingUsers = await User.find({
-        $or: [
-          { email: user.email.toLowerCase() },
-          { name: new RegExp(`^${user.name}$`, "i") },
-        ],
-      }).select("_id");
+      const userConditions = [];
+      if (user.email) userConditions.push({ email: user.email.toLowerCase() });
+      if (user.name) {
+        const safeName = user.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        userConditions.push({ name: new RegExp(`^${safeName}$`, "i") });
+      }
 
-      const userIds = matchingUsers.map((u) => u._id);
-      orConditions.push({ applicant: { $in: userIds } });
+      if (userConditions.length > 0) {
+        const matchingUsers = await User.find({ $or: userConditions }).select("_id");
+        const userIds = matchingUsers.map((u) => u._id);
+        orConditions.push({ applicant: { $in: userIds } });
+      }
     }
 
     const invitations = await Application.find({

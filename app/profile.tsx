@@ -50,7 +50,7 @@ export default function ProfileScreen() {
     return unsub;
   }, []);
 
-  const fetchInvitations = async () => {
+  const fetchInvitations = useCallback(async () => {
     const token = authStore.getToken();
     if (!token) return;
     setLoadingInvites(true);
@@ -58,15 +58,17 @@ export default function ProfileScreen() {
       const res = await ApiService.getMyInvitations(token);
       if (res && res.success && Array.isArray(res.invitations)) {
         setInvitations(res.invitations.filter((i: any) => i.status === "Pending"));
+      } else {
+        setInvitations([]);
       }
     } catch {
-      // Fallback
+      setInvitations([]);
     } finally {
       setLoadingInvites(false);
     }
-  };
+  }, []);
 
-  const fetchReviewsAndUserData = async () => {
+  const fetchReviewsAndUserData = useCallback(async () => {
     const user = authStore.getUser();
     if (!user) return;
 
@@ -76,6 +78,8 @@ export default function ProfileScreen() {
       const res = await ApiService.getUserReviews(user.id || user.name);
       if (res && res.success && Array.isArray(res.reviews)) {
         setPeerReviews(res.reviews);
+      } else {
+        setPeerReviews([]);
       }
     } catch (e) {
       console.warn("Fetch reviews warning:", e);
@@ -83,33 +87,33 @@ export default function ProfileScreen() {
       setLoadingReviews(false);
     }
 
-    // Refresh current user data from MongoDB (rating, reviewCount)
+    // Refresh current user data from MongoDB (rating, reviewCount) ONLY if values changed
     const token = authStore.getToken();
     if (token) {
       try {
         const meRes = await ApiService.getMe(token);
         if (meRes && meRes.success && meRes.user) {
-          authStore.setUser({
-            ...user,
-            rating: meRes.user.rating !== undefined ? meRes.user.rating : user.rating,
-            reviewCount: meRes.user.reviewCount !== undefined ? meRes.user.reviewCount : user.reviewCount,
-          });
-          setCurrentUser(authStore.getUser());
+          const freshRating = meRes.user.rating !== undefined ? meRes.user.rating : user.rating;
+          const freshCount = meRes.user.reviewCount !== undefined ? meRes.user.reviewCount : user.reviewCount;
+
+          if (freshRating !== user.rating || freshCount !== user.reviewCount) {
+            authStore.setUser({
+              ...user,
+              rating: freshRating,
+              reviewCount: freshCount,
+            });
+            setCurrentUser(authStore.getUser());
+          }
         }
       } catch {}
     }
-  };
-
-  useEffect(() => {
-    fetchInvitations();
-    fetchReviewsAndUserData();
-  }, [currentUser]);
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
       fetchInvitations();
       fetchReviewsAndUserData();
-    }, [currentUser])
+    }, [fetchInvitations, fetchReviewsAndUserData])
   );
 
   const openEditModal = () => {

@@ -29,6 +29,11 @@ class AuthStore {
     this.notify();
   }
 
+  setUser(user: AuthUser) {
+    this.user = user;
+    this.notify();
+  }
+
   clearSession() {
     this.token = null;
     this.user = null;

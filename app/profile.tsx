@@ -30,6 +30,8 @@ export default function ProfileScreen() {
   const [activeTab, setActiveTab] = useState<"skills" | "invitations" | "projects" | "reviews">("skills");
   const [invitations, setInvitations] = useState<any[]>([]);
   const [loadingInvites, setLoadingInvites] = useState(false);
+  const [peerReviews, setPeerReviews] = useState<any[]>([]);
+  const [loadingReviews, setLoadingReviews] = useState(false);
 
   // Edit Profile Modal state
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -64,13 +66,49 @@ export default function ProfileScreen() {
     }
   };
 
+  const fetchReviewsAndUserData = async () => {
+    const user = authStore.getUser();
+    if (!user) return;
+
+    // Fetch user reviews from MongoDB
+    try {
+      setLoadingReviews(true);
+      const res = await ApiService.getUserReviews(user.id || user.name);
+      if (res && res.success && Array.isArray(res.reviews)) {
+        setPeerReviews(res.reviews);
+      }
+    } catch (e) {
+      console.warn("Fetch reviews warning:", e);
+    } finally {
+      setLoadingReviews(false);
+    }
+
+    // Refresh current user data from MongoDB (rating, reviewCount)
+    const token = authStore.getToken();
+    if (token) {
+      try {
+        const meRes = await ApiService.getMe(token);
+        if (meRes && meRes.success && meRes.user) {
+          authStore.setUser({
+            ...user,
+            rating: meRes.user.rating !== undefined ? meRes.user.rating : user.rating,
+            reviewCount: meRes.user.reviewCount !== undefined ? meRes.user.reviewCount : user.reviewCount,
+          });
+          setCurrentUser(authStore.getUser());
+        }
+      } catch {}
+    }
+  };
+
   useEffect(() => {
     fetchInvitations();
+    fetchReviewsAndUserData();
   }, [currentUser]);
 
   useFocusEffect(
     useCallback(() => {
       fetchInvitations();
+      fetchReviewsAndUserData();
     }, [currentUser])
   );
 
@@ -300,7 +338,9 @@ export default function ProfileScreen() {
               <View style={styles.starRow}>
                 <Ionicons name="star" size={16} color="#F59E0B" />
                 <Text style={styles.ratingNumber}>
-                  {currentUser?.rating || 4.9}
+                  {typeof currentUser?.rating === "number"
+                    ? currentUser.rating.toFixed(1)
+                    : "5.0"}
                 </Text>
               </View>
               <Text style={styles.ratingSub}>Overall Rating</Text>
@@ -310,9 +350,11 @@ export default function ProfileScreen() {
 
             <View style={styles.ratingCol}>
               <Text style={styles.statBig}>
-                {currentUser?.reviewCount || 14}
+                {currentUser?.reviewCount !== undefined
+                  ? currentUser.reviewCount
+                  : peerReviews.length}
               </Text>
-              <Text style={styles.ratingSub}>Completed Projects</Text>
+              <Text style={styles.ratingSub}>Peer Reviews</Text>
             </View>
 
             <View style={styles.vDivider} />
@@ -377,7 +419,13 @@ export default function ProfileScreen() {
                   : "Invitations",
             },
             { key: "projects", label: "Projects (3)" },
-            { key: "reviews", label: "Peer Reviews (14)" },
+            {
+              key: "reviews",
+              label:
+                peerReviews.length > 0
+                  ? `Peer Reviews (${peerReviews.length})`
+                  : "Peer Reviews",
+            },
           ].map((tab) => {
             const isSel = activeTab === tab.key;
             return (
@@ -430,32 +478,88 @@ export default function ProfileScreen() {
         {/* Tab Content: Reviews */}
         {activeTab === "reviews" && (
           <View style={styles.reviewsList}>
-            {reviews.map((rev) => (
-              <View key={rev.id} style={styles.reviewCard}>
-                <View style={styles.reviewHeader}>
-                  <View>
-                    <Text style={styles.reviewerName}>{rev.reviewer}</Text>
-                    <Text style={styles.reviewerRole}>{rev.role}</Text>
-                  </View>
+            {loadingReviews ? (
+              <ActivityIndicator size="small" color={THEME.primary} style={{ marginVertical: 20 }} />
+            ) : peerReviews.length > 0 ? (
+              peerReviews.map((rev) => {
+                const reviewerName = rev.reviewer?.name || "Peer Teammate";
+                const projectTitle = rev.project?.title || "Team Project";
+                const overallScore = rev.ratings?.overall || 5.0;
+                const dateStr = rev.createdAt
+                  ? new Date(rev.createdAt).toLocaleDateString()
+                  : "Recent";
 
-                  <View style={styles.starBox}>
-                    <Ionicons name="star" size={13} color="#F59E0B" />
-                    <Text style={styles.starScore}>{rev.rating}</Text>
-                  </View>
-                </View>
+                return (
+                  <View key={rev._id} style={styles.reviewCard}>
+                    <View style={styles.reviewHeader}>
+                      <View style={{ flex: 1, paddingRight: 8 }}>
+                        <Text style={styles.reviewerName}>{reviewerName}</Text>
+                        <Text style={styles.reviewerRole}>
+                          {projectTitle} · {dateStr}
+                        </Text>
+                      </View>
 
-                <Text style={styles.reviewComment}>{rev.comment}</Text>
-
-                <View style={styles.categoryScoresRow}>
-                  {Object.entries(rev.categories).map(([k, v]) => (
-                    <View key={k} style={styles.categoryScoreItem}>
-                      <Text style={styles.categoryKey}>{k}:</Text>
-                      <Text style={styles.categoryVal}>{v}★</Text>
+                      <View style={styles.starBox}>
+                        <Ionicons name="star" size={13} color="#F59E0B" />
+                        <Text style={styles.starScore}>
+                          {typeof overallScore === "number" ? overallScore.toFixed(1) : overallScore}
+                        </Text>
+                      </View>
                     </View>
-                  ))}
+
+                    <Text style={styles.reviewComment}>{rev.comment}</Text>
+
+                    {rev.ratings && (
+                      <View style={styles.categoryScoresRow}>
+                        <View style={styles.categoryScoreItem}>
+                          <Text style={styles.categoryKey}>Score:</Text>
+                          <Text style={styles.categoryVal}>{overallScore}★</Text>
+                        </View>
+                        {rev.ratings.technicalSkills ? (
+                          <View style={styles.categoryScoreItem}>
+                            <Text style={styles.categoryKey}>Technical:</Text>
+                            <Text style={styles.categoryVal}>{rev.ratings.technicalSkills}★</Text>
+                          </View>
+                        ) : null}
+                        {rev.ratings.teamwork ? (
+                          <View style={styles.categoryScoreItem}>
+                            <Text style={styles.categoryKey}>Teamwork:</Text>
+                            <Text style={styles.categoryVal}>{rev.ratings.teamwork}★</Text>
+                          </View>
+                        ) : null}
+                      </View>
+                    )}
+                  </View>
+                );
+              })
+            ) : (
+              reviews.map((rev) => (
+                <View key={rev.id} style={styles.reviewCard}>
+                  <View style={styles.reviewHeader}>
+                    <View>
+                      <Text style={styles.reviewerName}>{rev.reviewer}</Text>
+                      <Text style={styles.reviewerRole}>{rev.role}</Text>
+                    </View>
+
+                    <View style={styles.starBox}>
+                      <Ionicons name="star" size={13} color="#F59E0B" />
+                      <Text style={styles.starScore}>{rev.rating}</Text>
+                    </View>
+                  </View>
+
+                  <Text style={styles.reviewComment}>{rev.comment}</Text>
+
+                  <View style={styles.categoryScoresRow}>
+                    {Object.entries(rev.categories).map(([k, v]) => (
+                      <View key={k} style={styles.categoryScoreItem}>
+                        <Text style={styles.categoryKey}>{k}:</Text>
+                        <Text style={styles.categoryVal}>{v}★</Text>
+                      </View>
+                    ))}
+                  </View>
                 </View>
-              </View>
-            ))}
+              ))
+            )}
           </View>
         )}
 

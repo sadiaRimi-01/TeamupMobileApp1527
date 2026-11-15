@@ -158,6 +158,13 @@ export default function MyProjectsScreen() {
   const [isManageModalOpen, setIsManageModalOpen] = useState(false);
   const [isProgressModalOpen, setIsProgressModalOpen] = useState(false);
   const [isMilestoneModalOpen, setIsMilestoneModalOpen] = useState(false);
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+  const [reviewCandidates, setReviewCandidates] = useState<TeamMemberProgress[]>([]);
+  const [selectedTargetMember, setSelectedTargetMember] = useState<TeamMemberProgress | null>(null);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState("");
+  const [submittingReview, setSubmittingReview] = useState(false);
+  const [isMemberDropdownOpen, setIsMemberDropdownOpen] = useState(false);
 
   // Progress update state
   const [editProgress, setEditProgress] = useState("68");
@@ -520,6 +527,49 @@ export default function MyProjectsScreen() {
     );
   };
 
+  // Action 5: Submit Peer Review & Rating
+  const handleSubmitReview = async () => {
+    if (!selectedTargetMember) {
+      Alert.alert("Select Member", "Please choose a team member to review.");
+      return;
+    }
+    if (!reviewComment.trim()) {
+      Alert.alert("Feedback Required", "Please write a few lines of review feedback.");
+      return;
+    }
+
+    const token = authStore.getToken();
+    if (!token) {
+      Alert.alert("Sign In Required", "Please sign in to submit a review.");
+      return;
+    }
+
+    setSubmittingReview(true);
+    try {
+      const res = await ApiService.createReview(token, {
+        targetUserId: selectedTargetMember.id,
+        projectId: selectedProject?.id || "",
+        rating: reviewRating,
+        comment: reviewComment.trim(),
+      });
+
+      if (res && res.success) {
+        setIsReviewModalOpen(false);
+        setReviewComment("");
+        Alert.alert(
+          "Review Submitted! 🌟",
+          `Your ${reviewRating}.0★ review for ${selectedTargetMember.name} has been saved to MongoDB!\n\nThis will now reflect in their profile's Peer Reviews and update their average rating.`
+        );
+      } else {
+        Alert.alert("Notice", res.message || "Failed to submit review.");
+      }
+    } catch (err: any) {
+      Alert.alert("Error", err.message || "Could not submit review.");
+    } finally {
+      setSubmittingReview(false);
+    }
+  };
+
   // Auth Guard: If not logged in, prompt user to sign in
   if (!isAuth) {
     return (
@@ -781,6 +831,37 @@ export default function MyProjectsScreen() {
                   <Text style={styles.actionBtnChatText}>Team Chat</Text>
                 </TouchableOpacity>
               </View>
+
+              {/* Give Review & Rating Button */}
+              <TouchableOpacity
+                style={styles.actionBtnReview}
+                onPress={() => {
+                  setSelectedProject(p);
+                  const otherMembers = p.members.filter((m) => {
+                    if (!user) return true;
+                    const idMatch =
+                      m.id &&
+                      user.id &&
+                      (m.id === user.id || m.id.includes(user.id) || user.id.includes(m.id));
+                    const nameMatch =
+                      m.name &&
+                      user.name &&
+                      (m.name.toLowerCase().trim() === user.name.toLowerCase().trim() ||
+                        m.name.toLowerCase().includes("(you)"));
+                    return !idMatch && !nameMatch;
+                  });
+                  const list = otherMembers.length > 0 ? otherMembers : p.members;
+                  setReviewCandidates(list);
+                  setSelectedTargetMember(list[0] || null);
+                  setReviewRating(5);
+                  setReviewComment("");
+                  setIsMemberDropdownOpen(false);
+                  setIsReviewModalOpen(true);
+                }}
+              >
+                <Ionicons name="star" size={15} color="#F59E0B" />
+                <Text style={styles.actionBtnReviewText}>Give Review & Rating</Text>
+              </TouchableOpacity>
             </View>
           );
         })}
@@ -999,6 +1080,164 @@ export default function MyProjectsScreen() {
               onPress={() => setIsManageModalOpen(false)}
             >
               <Text style={styles.modalSubmitText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal 4: Give Review & Rating Modal */}
+      <Modal
+        visible={isReviewModalOpen}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setIsReviewModalOpen(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <View style={styles.reviewModalIconBox}>
+                  <Ionicons name="star" size={18} color="#F59E0B" />
+                </View>
+                <View>
+                  <Text style={styles.modalTitle}>Give Review & Rating</Text>
+                  <Text style={styles.reviewModalSub} numberOfLines={1}>
+                    {selectedProject?.title || "Project Team"}
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity onPress={() => setIsReviewModalOpen(false)}>
+                <Ionicons name="close" size={24} color={THEME.inkDark} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={{ maxHeight: 400 }} showsVerticalScrollIndicator={false}>
+              {/* Member Selector / Dropdown */}
+              <Text style={styles.fieldLabel}>Select Team Member:</Text>
+
+              <TouchableOpacity
+                style={styles.dropdownTrigger}
+                onPress={() => setIsMemberDropdownOpen(!isMemberDropdownOpen)}
+              >
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 10, flex: 1 }}>
+                  <View style={styles.dropdownAvatar}>
+                    <Text style={styles.dropdownAvatarText}>
+                      {selectedTargetMember?.initials || "TM"}
+                    </Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.dropdownSelectedName}>
+                      {selectedTargetMember?.name || "Choose a teammate"}
+                    </Text>
+                    <Text style={styles.dropdownSelectedRole}>
+                      {selectedTargetMember?.role || "Team Member"}
+                    </Text>
+                  </View>
+                </View>
+                <Ionicons
+                  name={isMemberDropdownOpen ? "chevron-up" : "chevron-down"}
+                  size={18}
+                  color={THEME.textSecondary}
+                />
+              </TouchableOpacity>
+
+              {/* Dropdown Options List */}
+              {isMemberDropdownOpen && (
+                <View style={styles.dropdownMenu}>
+                  {reviewCandidates.map((m) => {
+                    const isSelected = selectedTargetMember?.id === m.id;
+                    return (
+                      <TouchableOpacity
+                        key={m.id}
+                        style={[
+                          styles.dropdownItem,
+                          isSelected && styles.dropdownItemActive,
+                        ]}
+                        onPress={() => {
+                          setSelectedTargetMember(m);
+                          setIsMemberDropdownOpen(false);
+                        }}
+                      >
+                        <View style={styles.dropdownItemAvatar}>
+                          <Text style={styles.dropdownItemAvatarText}>{m.initials}</Text>
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text
+                            style={[
+                              styles.dropdownItemName,
+                              isSelected && styles.dropdownItemNameActive,
+                            ]}
+                          >
+                            {m.name}
+                          </Text>
+                          <Text style={styles.dropdownItemRole}>{m.role}</Text>
+                        </View>
+                        {isSelected && (
+                          <Ionicons name="checkmark-circle" size={18} color={THEME.primary} />
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              )}
+
+              {/* Interactive Star Rating */}
+              <View style={styles.ratingSection}>
+                <Text style={styles.fieldLabel}>Rating (Highest 5):</Text>
+                <View style={styles.starRatingRow}>
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <TouchableOpacity
+                      key={star}
+                      onPress={() => setReviewRating(star)}
+                      style={styles.starTouch}
+                    >
+                      <Ionicons
+                        name={star <= reviewRating ? "star" : "star-outline"}
+                        size={32}
+                        color={star <= reviewRating ? "#F59E0B" : "#D1D5DB"}
+                      />
+                    </TouchableOpacity>
+                  ))}
+                  <View style={styles.ratingScorePill}>
+                    <Text style={styles.ratingScorePillText}>{reviewRating}.0 / 5.0</Text>
+                  </View>
+                </View>
+              </View>
+
+              {/* Review Feedback Comment */}
+              <View style={{ marginTop: 14 }}>
+                <Text style={styles.fieldLabel}>Review Feedback (A few lines):</Text>
+                <TextInput
+                  style={styles.reviewCommentInput}
+                  value={reviewComment}
+                  onChangeText={setReviewComment}
+                  placeholder="Write your review and feedback about working with this teammate..."
+                  placeholderTextColor={THEME.textMuted}
+                  multiline
+                  numberOfLines={4}
+                  textAlignVertical="top"
+                />
+              </View>
+            </ScrollView>
+
+            {/* Submit Button */}
+            <TouchableOpacity
+              style={[
+                styles.modalSubmitBtn,
+                styles.submitReviewBtn,
+                submittingReview && { opacity: 0.7 },
+              ]}
+              onPress={handleSubmitReview}
+              disabled={submittingReview}
+            >
+              {submittingReview ? (
+                <ActivityIndicator color={THEME.white} />
+              ) : (
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  <Ionicons name="paper-plane" size={16} color={THEME.white} />
+                  <Text style={styles.modalSubmitText}>Submit Review to MongoDB 🌟</Text>
+                </View>
+              )}
             </TouchableOpacity>
           </View>
         </View>
@@ -1607,6 +1846,164 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "800",
     color: "#EF4444",
+  },
+  actionBtnReview: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: "#FFFBEB",
+    borderWidth: 1.5,
+    borderColor: "#FDE68A",
+    paddingVertical: 10,
+    borderRadius: 12,
+    marginTop: 8,
+  },
+  actionBtnReviewText: {
+    color: "#B45309",
+    fontWeight: "800",
+    fontSize: 13,
+  },
+  reviewModalIconBox: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: "#FEF3C7",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  reviewModalSub: {
+    fontSize: 11,
+    color: THEME.textMuted,
+    fontWeight: "600",
+    maxWidth: 220,
+  },
+  fieldLabel: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: THEME.inkDark,
+    marginBottom: 6,
+  },
+  dropdownTrigger: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#F8FAFC",
+    borderWidth: 1,
+    borderColor: THEME.cardBorder,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 8,
+  },
+  dropdownAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: THEME.primary,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  dropdownAvatarText: {
+    color: THEME.white,
+    fontWeight: "900",
+    fontSize: 12,
+  },
+  dropdownSelectedName: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: THEME.inkDark,
+  },
+  dropdownSelectedRole: {
+    fontSize: 11,
+    color: THEME.textMuted,
+  },
+  dropdownMenu: {
+    backgroundColor: THEME.white,
+    borderWidth: 1,
+    borderColor: THEME.cardBorder,
+    borderRadius: 12,
+    marginBottom: 12,
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  dropdownItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    padding: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F1F5F9",
+  },
+  dropdownItemActive: {
+    backgroundColor: "#EEF2FF",
+  },
+  dropdownItemAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: THEME.secondary,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  dropdownItemAvatarText: {
+    color: THEME.white,
+    fontWeight: "800",
+    fontSize: 11,
+  },
+  dropdownItemName: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: THEME.inkDark,
+  },
+  dropdownItemNameActive: {
+    color: THEME.primary,
+    fontWeight: "900",
+  },
+  dropdownItemRole: {
+    fontSize: 10,
+    color: THEME.textMuted,
+  },
+  ratingSection: {
+    marginTop: 10,
+  },
+  starRatingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 6,
+  },
+  starTouch: {
+    padding: 4,
+  },
+  ratingScorePill: {
+    marginLeft: "auto",
+    backgroundColor: "#FEF3C7",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+  },
+  ratingScorePillText: {
+    color: "#B45309",
+    fontWeight: "800",
+    fontSize: 12,
+  },
+  reviewCommentInput: {
+    backgroundColor: "#F8FAFC",
+    borderWidth: 1,
+    borderColor: THEME.cardBorder,
+    borderRadius: 12,
+    padding: 12,
+    fontSize: 13,
+    color: THEME.inkDark,
+    minHeight: 90,
+    marginTop: 6,
+  },
+  submitReviewBtn: {
+    backgroundColor: THEME.primary,
   },
 });
 
